@@ -3,6 +3,7 @@ package com.assistencia.controller;
 import com.assistencia.model.*;
 import com.assistencia.repository.*;
 import com.assistencia.util.SecurityUtils;
+import com.assistencia.service.EmailService;
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.common.IdentificationRequest;
 import com.mercadopago.client.payment.PaymentClient;
@@ -34,6 +35,9 @@ public class AdminController {
 
     @Autowired
     private SecurityUtils securityUtils;
+
+    @Autowired
+    private EmailService emailService;
 
     @Value("${mercado_pago_sample_access_token}")
     private String mpAccessToken;
@@ -73,19 +77,16 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    // 🦈 SHARK DELETE: Novo método para excluir funcionário (Resolve erro 404)
     @DeleteMapping("/funcionarios/{id}")
     public ResponseEntity<?> excluirFuncionario(@PathVariable Long id) {
         Usuario admin = securityUtils.getUsuarioLogado();
         if (admin == null) return ResponseEntity.status(403).build();
 
         return usuarioRepo.findById(id).map(u -> {
-            // Verifica se o funcionário pertence à mesma empresa
             if (!u.getEmpresa().getId().equals(admin.getEmpresa().getId())) {
                 return ResponseEntity.status(403).body("Acesso negado.");
             }
 
-            // Impede excluir o proprietário
             if ("PROPRIETARIO".equalsIgnoreCase(u.getTipoFuncionario())) {
                 return ResponseEntity.badRequest().body("Não é possível excluir o proprietário da unidade.");
             }
@@ -187,10 +188,20 @@ public class AdminController {
     @PostMapping("/funcionarios/aprovar/{id}")
     public ResponseEntity<?> aprovarFuncionario(@PathVariable Long id) {
         Usuario admin = securityUtils.getUsuarioLogado();
+        if (admin == null) return ResponseEntity.status(403).build();
+
         return usuarioRepo.findById(id).map(u -> {
             if (u.getEmpresa().getId().equals(admin.getEmpresa().getId())) {
                 u.setAprovado(true);
                 usuarioRepo.save(u);
+
+                // 📧 DISPARO DE E-MAIL DE APROVAÇÃO (Shark Gestão)
+                emailService.enviarEmailAprovacaoFuncionario(
+                        u.getEmail(),
+                        u.getNome(),
+                        u.getEmpresa().getNome()
+                );
+
                 return ResponseEntity.ok().build();
             }
             return ResponseEntity.status(403).build();

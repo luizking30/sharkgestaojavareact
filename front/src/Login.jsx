@@ -60,10 +60,11 @@ function Login() {
     setLoading(true);
 
     try {
-      // Envia o identificador (Login, CPF, Email ou Whats) para o endpoint de esqueci-senha
+      // O Java agora retorna: "Instruções de recuperação enviadas para o e-mail: xxxx@xxx.com"
       const response = await axios.post(`http://localhost:8080/api/auth/esqueci-senha?identificador=${identificador}`);
-      setSuccessMsg(response.data);
-      setIsRecovery(false); // Volta para tela de login com msg de sucesso
+
+      setSuccessMsg(response.data); // Exibe a frase dinâmica com o e-mail
+      setIsRecovery(false); // Volta para tela de login com o card de sucesso visível
       setIdentificador('');
     } catch (error) {
       const msg = error.response?.data;

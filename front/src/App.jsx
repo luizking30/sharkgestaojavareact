@@ -81,7 +81,7 @@ function App() {
                 path="/"
                 element={!usuarioLogado ? <Login /> : <Navigate to="/dashboard" replace />}
             />
-            <Route path="/nova-senha" element={<NovaSenha />} />
+            <Route path="/resetar-senha" element={<NovaSenha />} />
             <Route path="/registro-empresa" element={<RegistroEmpresa />} />
             <Route path="/registro-funcionario" element={<RegistroFuncionario />} />
 

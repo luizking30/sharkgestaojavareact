@@ -11,7 +11,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
     const [modalData, setModalData] = useState({ id: '', nome: '', tipo: '', comOs: 0, comVenda: 0, liqOs: 0, liqVenda: 0 });
     const [cnpjInput, setCnpjInput] = useState('');
 
-    // 1. BUSCA DE DADOS GERAIS (Sincronizado com AdminController.java)
+    // 1. BUSCA DE DADOS GERAIS
     const { data: adminData, isLoading } = useQuery({
         queryKey: ['admin-dados'],
         queryFn: async () => {
@@ -24,12 +24,11 @@ const AdminEmpresa = ({ usuarioLogado }) => {
     const pagamentos = adminData?.pagamentos || [];
     const empresa = adminData?.empresa || {};
 
-    // Sincroniza o input de CNPJ quando os dados da empresa chegam do banco
     useEffect(() => {
         if (empresa.cnpj) setCnpjInput(empresa.cnpj);
     }, [empresa.cnpj]);
 
-    // --- FUNÇÃO PARA LIMPAR TRAVAMENTOS DE MODAL DO BOOTSTRAP ---
+    // --- FUNÇÃO PARA LIMPAR TRAVAMENTOS DE MODAL ---
     const forceCloseModals = () => {
         const backdrops = document.querySelectorAll('.modal-backdrop');
         backdrops.forEach(b => b.remove());
@@ -38,7 +37,15 @@ const AdminEmpresa = ({ usuarioLogado }) => {
         document.body.style.paddingRight = '';
     };
 
-    // 2. MUTAÇÕES (Ações de formulário)
+    // 2. MUTAÇÕES
+    const aprovarMutation = useMutation({
+        mutationFn: (id) => api.post(`/api/admin/funcionarios/aprovar/${id}`),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+        },
+        onError: () => alert("Erro ao aprovar colaborador.")
+    });
+
     const pagarMutation = useMutation({
         mutationFn: (payload) => api.post('/api/pagamentos/registrar', payload),
         onSuccess: () => {
@@ -60,7 +67,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
             forceCloseModals();
         },
         onError: (err) => {
-            const msg = err.response?.data?.message || err.response?.data || "Erro interno no servidor";
+            const msg = err.response?.data?.message || err.response?.data || "Erro interno";
             alert("Erro ao salvar: " + msg);
         }
     });
@@ -83,7 +90,6 @@ const AdminEmpresa = ({ usuarioLogado }) => {
 
     const formatarMoeda = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-    // Lógica Mercado Pago
     const gerarPagamentoMP = async (dias) => {
         try {
             const res = await api.post(`/api/admin/empresa/gerar-renovacao?dias=${dias}`);
@@ -236,7 +242,13 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                                     </td>
                                     <td>
                                         {!u.aprovado ? (
-                                            <button className="btn btn-sm btn-info fw-bold w-100 py-2" onClick={() => api.post(`/api/admin/funcionarios/aprovar/${u.id}`).then(() => queryClient.invalidateQueries(['admin-dados']))}>ACEITAR NOVO</button>
+                                            <button
+                                                className="btn btn-sm btn-info fw-bold w-100 py-2"
+                                                disabled={aprovarMutation.isPending}
+                                                onClick={() => aprovarMutation.mutate(u.id)}
+                                            >
+                                                {aprovarMutation.isPending ? <i className="bi bi-arrow-repeat spin"></i> : "ACEITAR NOVO"}
+                                            </button>
                                         ) : saldoTotal > 0.01 ? (
                                             <div className="d-flex flex-column gap-1">
                                                 {liqVenda > 0.01 && <button className="btn btn-sm btn-info fw-bold py-1" onClick={() => pagarMutation.mutate({funcionarioId: u.id, valorPago: liqVenda, tipoComissao: 'VENDA'})}>PAGAR VENDAS</button>}

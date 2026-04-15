@@ -44,7 +44,6 @@ public class AuthController {
         }
 
         // 2. Autenticação Oficial via Spring Security (Valida Senha)
-        // Se o usuário for null ou a senha estiver errada, o Spring lança BadCredentialsException
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(dados.username(), dados.password())
         );
@@ -105,7 +104,18 @@ public class AuthController {
             usuario.setAprovado(false);
             usuario.setEmpresa(emp);
 
-            return ResponseEntity.ok(usuarioRepository.save(usuario));
+            Usuario salvo = usuarioRepository.save(usuario);
+
+            // 📧 DISPARO DE BOAS-VINDAS PARA FUNCIONÁRIO (Layout Padronizado)
+            emailService.enviarBoasVindasFuncionario(
+                    salvo.getEmail(),
+                    emp.getNome(),
+                    salvo.getUsername(),
+                    salvo.getCpf(),
+                    salvo.getWhatsapp()
+            );
+
+            return ResponseEntity.ok(salvo);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Erro ao registrar: " + e.getMessage());
         }
@@ -164,6 +174,17 @@ public class AuthController {
             usuario.setEmpresa(salva);
 
             usuarioRepository.save(usuario);
+
+            // 📧 DISPARO DE BOAS-VINDAS SHARK (Layout Padronizado)
+            emailService.enviarBoasVindasEmpresa(
+                    usuario.getEmail(),
+                    nomeEmpresa,
+                    cnpjLimpo,
+                    usuario.getUsername(),
+                    usuario.getCpf(),
+                    usuario.getWhatsapp()
+            );
+
             return ResponseEntity.ok(Map.of("status", "sucesso"));
 
         } catch (Exception e) {
@@ -173,24 +194,19 @@ public class AuthController {
 
     @PostMapping("/esqueci-senha")
     public ResponseEntity<?> esqueciSenha(@RequestParam String identificador) {
-        // 1. Limpa o identificador (remove pontos, traços e parênteses)
-        // para buscar CPF ou WhatsApp puramente numéricos se necessário
         String idLimpo = identificador.replaceAll("[.\\-/() ]", "");
 
-        // 2. Tenta buscar pelo valor original OU pelo valor limpo
         return usuarioRepository.findByIdentificadorRecuperacao(identificador)
                 .or(() -> usuarioRepository.findByIdentificadorRecuperacao(idLimpo))
                 .map(user -> {
-                    // Gera token de 1 hora
                     String token = UUID.randomUUID().toString();
                     user.setResetPasswordToken(token);
                     user.setTokenExpiration(LocalDateTime.now().plusHours(1));
                     usuarioRepository.save(user);
 
-                    // 📧 O e-mail é enviado para o endereço cadastrado no perfil do usuário
                     emailService.enviarEmailRecuperacao(user.getEmail(), token);
 
-                    return ResponseEntity.ok("Instruções de recuperação enviadas para o e-mail cadastrado.");
+                    return ResponseEntity.ok("Instruções de recuperação enviadas para o e-mail: " + user.getEmail());
                 })
                 .orElse(ResponseEntity.status(404).body("Nenhum usuário localizado com os dados informados."));
     }
