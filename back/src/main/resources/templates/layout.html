@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shark Eletrônicos</title>
+
+  <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}"/>
+  <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : 'X-CSRF-TOKEN'}"/>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link rel="icon" type="image/png" th:href="@{/images/favicon.png}">
+
+  <style>
+    :root {
+      --shark-blue: #0047ab;
+      --shark-light-blue: #00d4ff;
+      --shark-black: #020617;
+      --shark-card-bg: #1e293b;
+      --shark-white: #f8fafc;
+      --nav-hover: rgba(0, 212, 255, 0.1);
+      --shark-confirm: #00c853;
+    }
+    body {
+      background-color: #0f172a;
+      color: var(--shark-white);
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    /* CAMADA DE BLOQUEIO TOTAL */
+    .lock-screen {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(2, 6, 23, 0.95);
+      backdrop-filter: blur(15px);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .btn {
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 10px;
+    }
+
+    .btn:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    }
+
+    .btn-primary {
+      background-color: var(--shark-blue);
+      border: 1px solid var(--shark-light-blue);
+    }
+    .btn-primary:hover {
+      background-color: var(--shark-light-blue);
+      border-color: var(--shark-white);
+      color: var(--shark-black);
+    }
+
+    .btn-success {
+      background-color: #059669;
+      border: none;
+    }
+    .btn-success:hover {
+      background-color: var(--shark-confirm);
+      box-shadow: 0 0 150px rgba(0, 200, 83, 0.4);
+    }
+
+    .navbar {
+      background-color: var(--shark-black) !important;
+      border-bottom: 2px solid var(--shark-blue);
+      padding: 0.5rem 1.5rem;
+    }
+
+    .navbar-brand img {
+      height: 100px;
+      width: auto;
+      filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.4));
+      transition: transform 0.3s ease;
+    }
+    .navbar-brand:hover img {
+      transform: scale(1.1);
+    }
+
+    .nav-link {
+      color: #94a3b8 !important;
+      border-radius: 10px;
+      transition: 0.3s;
+      display: flex;
+      align-items: center; gap: 10px; margin: 0 5px;
+      font-weight: 500;
+    }
+    .nav-link:hover, .nav-link.active {
+      background-color: var(--nav-hover);
+      color: var(--shark-light-blue) !important;
+      transform: translateY(-2px);
+    }
+
+    main.container {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(8px);
+      border-radius: 20px;
+      padding: 30px;
+      margin-top: 2rem;
+      margin-bottom: 2rem;
+      border: 1px solid rgba(0, 212, 255, 0.1);
+      min-height: 80vh;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .badge-financeiro {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid #334155;
+      padding: 5px 12px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-pagar {
+      background: #f59e0b;
+      color: #000;
+      border: none;
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 768px) {
+      main.container { padding: 15px; margin-top: 1rem; border-radius: 0; }
+      .navbar-brand img { height: 40px; }
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid #ef4444;
+      color: #ef4444;
+      border-radius: 8px;
+      padding: 5px 15px;
+      transition: 0.3s;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+    }
+    .btn-logout:hover {
+      background: #ef4444;
+      color: white;
+      transform: scale(1.1);
+    }
+
+    .modal-backdrop { z-index: 1040 !important; }
+    .modal { z-index: 1050 !important; }
+
+    .user-info-text {
+      line-height: 1.1;
+      text-align: right;
+    }
+  </style>
+
+  <th:block layout:fragment="estilos"></th:block>
+</head>
+
+<body>
+
+<div th:if="${usuarioLogado?.empresa?.diasRestantes <= 0}" class="lock-screen" id="sharkLockScreen">
+  <img th:src="@{/images/logo_layout.png}" alt="Shark" style="width: 250px; margin-bottom: 20px; filter: grayscale(1);">
+  <h2 class="text-danger fw-bold">ACESSO EXPIRADO</h2>
+  <p class="text-white-50 mb-4">Sua empresa possui 0 dias de acesso. Regularize sua assinatura para continuar utilizando o sistema.</p>
+  <a th:href="@{/pagamento}" class="btn btn-warning btn-lg px-5 fw-bold text-dark">
+    <i class="bi bi-credit-card-2-front me-2"></i>PAGAR AGORA
+  </a>
+  <form th:action="@{/logout}" method="post" class="mt-4">
+    <button type="submit" class="btn btn-link text-danger text-decoration-none small">Sair do Sistema</button>
+  </form>
+</div>
+
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-lg">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center" th:href="@{/dashboard}">
+      <img th:src="@{/images/logo_layout.png}" alt="Shark Eletrônicos">
+    </a>
+
+    <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="menu">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3" th:if="${usuarioLogado?.empresa?.diasRestantes > 0}">
+        <li class="nav-item"><a class="nav-link" th:href="@{/dashboard}"><i class="bi bi-grid-1x2"></i> Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/clientes}"><i class="bi bi-people"></i> Clientes</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/estoque}"><i class="bi bi-cpu"></i> Estoque</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/ordens}"><i class="bi bi-tools"></i> O.S.</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/vendas}"><i class="bi bi-cart-check"></i> Vendas</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/contas}"><i class="bi bi-cash-stack"></i> Contas</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/relatorios}"><i class="bi bi-file-earmark-bar-graph"></i> Relatórios</a></li>
+        <li class="nav-item"><a class="nav-link" th:href="@{/meus-ganhos}"><i class="bi bi-wallet2"></i> Meu Painel</a></li>
+
+        <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+          <a class="nav-link" th:href="@{/admin/funcionarios}" style="color: var(--shark-light-blue) !important;">
+            <i class="bi bi-shield-lock"></i> Painel Empresa
+          </a>
+        </li>
+      </ul>
+
+      <div class="navbar-nav me-auto ps-3" th:if="${usuarioLogado?.empresa?.diasRestantes <= 0}">
+        <span class="text-warning fw-bold"><i class="bi bi-exclamation-triangle"></i> ASSINATURA PENDENTE</span>
+      </div>
+
+      <div class="d-flex align-items-center gap-3">
+        <div class="badge-financeiro">
+          <div class="text-end">
+            <small class="d-block text-white-50" style="font-size: 0.55rem; font-weight: 800;">DIAS PAGO</small>
+            <span class="fw-bold"
+                  th:classappend="${usuarioLogado?.empresa?.diasRestantes > 5 ? 'text-success' : 'text-warning'}"
+                  th:text="${usuarioLogado?.empresa?.diasRestantes ?: 0}">30</span>
+          </div>
+          <a th:href="@{/pagamento}" class="btn-pagar text-decoration-none">PAGAR</a>
+        </div>
+
+        <div class="user-info-text d-none d-lg-block" sec:authorize="isAuthenticated()">
+          <small class="d-block text-uppercase fw-bold" style="font-size: 0.62rem; color: #94a3b8; letter-spacing: 1px;">
+            <i class="bi bi-building me-1"></i> <span th:text="${usuarioLogado?.empresa?.nome}">UNIDADE PRINCIPAL</span>
+          </small>
+          <span style="color: #94a3b8; font-weight: 500; font-size: 0.8rem;">Bem-vindo,</span>
+          <span class="text-white fw-bold" style="text-shadow: 0 0 5px rgba(0, 212, 255, 0.4);" th:text="${usuarioLogado?.nome}">Usuário</span>
+          <div class="mt-0">
+            <span th:if="${usuarioLogado?.tipoFuncionario == 'PROPRIETARIO'}" class="badge border border-warning text-warning" style="font-size: 0.55rem; padding: 2px 6px;">
+               <i class="bi bi-star-fill me-1"></i>PROPRIETÁRIO
+            </span>
+            <span th:if="${usuarioLogado?.tipoFuncionario != 'PROPRIETARIO'}" class="badge border border-info text-info" style="font-size: 0.55rem; padding: 2px 6px;">
+               <i class="bi bi-tools me-1"></i>VENDEDOR TÉCNICO
+            </span>
+          </div>
+        </div>
+
+        <form th:action="@{/logout}" method="post" id="logoutForm" class="m-0">
+          <button type="submit" class="btn-logout border-0 bg-transparent">
+            <i class="bi bi-power"></i> <span class="d-lg-none">Sair</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <div layout:fragment="conteudo"></div>
+</main>
+
+<div layout:fragment="modais"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  function sharkLimpeza() {
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+  }
+  document.addEventListener('hidden.bs.modal', sharkLimpeza);
+
+  if (window.location.pathname.includes('/pagamento')) {
+    const lock = document.getElementById('sharkLockScreen');
+    if (lock) {
+      lock.style.removeProperty('display');
+      lock.style.display = 'none';
+    }
+  }
+</script>
+
+<th:block layout:fragment="scripts"></th:block>
+
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Relatórios Shark - Mensal</title>
+    <style>
+        .shark-card {
+            background: #1a1a1a;
+            border-radius: 15px;
+            border: none;
+            border-left: 5px solid #333;
+            transition: all 0.3s ease;
+        }
+        .shark-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            filter: brightness(1.2);
+        }
+
+        .border-left-danger { border-left-color: #dc3545 !important; }
+        .border-left-success { border-left-color: #198754 !important; }
+        .border-left-info { border-left-color: #0dcaf0 !important; }
+        .border-left-total { border-left: 8px solid #06f906 !important; }
+
+        .glow-success { filter: drop-shadow(0 0 5px #198754); }
+        .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
+        .glow-danger { filter: drop-shadow(0 0 5px #dc3545); }
+
+        .icon-large-side { font-size: 3.5rem; opacity: 0.8; }
+
+        .rocket-animate {
+            display: inline-block;
+            animation: float 2s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(5deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+
+        .shark-table-card {
+            background: #141414;
+            border: 1px solid #333;
+            border-radius: 15px;
+            overflow: hidden;
+            border-left: 5px solid #333;
+        }
+
+        .text-glow { text-shadow: 0 0 15px rgba(6, 249, 6, 0.6); }
+
+        input[type="month"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
+
+        @media print {
+            .d-print-none, .btn, .navbar, .btn-logout, form { display: none !important; }
+            body { background: white !important; color: black !important; }
+            .shark-card { border: 1px solid #ddd !important; border-left: 5px solid #333 !important; color: black !important; }
+            .h3, .h4, .h5, .fw-bold, td, th, p, h6 { color: black !important; }
+            .shark-table-card { border: 1px solid #000 !important; background: transparent !important; }
+        }
+    </style>
+</head>
+
+<body>
+<div layout:fragment="conteudo">
+
+    <div class="mt-2 text-white">
+        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+            <div>
+                <h2 class="fw-bold mb-0 text-white"><i class="bi bi-calendar-check text-success glow-success"></i> Fechamento Mensal Shark</h2>
+                <p class="text-white-50 small">Análise consolidada por mês de referência</p>
+            </div>
+            <button onclick="window.print()" class="btn btn-outline-info fw-bold shadow-sm">
+                <i class="bi bi-printer me-2"></i>Imprimir Fechamento
+            </button>
+        </div>
+
+        <div class="card shark-card border-left-info shadow-sm mb-4 d-print-none" style="background: rgba(15, 23, 42, 0.6) !important;">
+            <div class="card-body">
+                <form method="get" th:action="@{/relatorios/mensal}" class="row g-3 align-items-end">
+                    <div class="col-md-8">
+                        <label class="text-info small fw-bold mb-1 text-uppercase">Selecione o Mês</label>
+                        <input type="month" name="mesReferencia" th:value="${mesReferencia}" class="form-control bg-black text-white border-secondary shadow-none" required>
+                    </div>
+                    <div class="col-md-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-info w-100 fw-bold">
+                            <i class="bi bi-search"></i> Gerar Relatório
+                        </button>
+                        <a th:href="@{/relatorios/mensal}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div th:if="${mesReferencia != null}">
+
+            <h5 class="text-success small fw-bold mb-3 text-uppercase"><i class="bi bi-bag-check me-2"></i>Movimento de Vendas</h5>
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="card p-4 h-100 shark-card border-left-success">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-success small fw-bold text-uppercase mb-2">Venda Bruta</h6>
+                                <h3 class="text-white mb-0 fw-bold">R$ <span th:text="${totalVendasBruto != null ? #numbers.formatDecimal(totalVendasBruto, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-graph-up text-success icon-large-side glow-success"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-4 h-100 shark-card border-left-danger">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-danger small fw-bold text-uppercase mb-2">Custo Estoque</h6>
+                                <h3 class="text-danger mb-0 fw-bold">R$ <span th:text="${custoEstoqueVendido != null ? #numbers.formatDecimal(custoEstoqueVendido, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-graph-down text-danger icon-large-side glow-danger"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-4 h-100 shark-card border-left-info" style="background: linear-gradient(45deg, #0b222e, #1a1a1a);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-info small fw-bold text-uppercase mb-2">Lucro em Vendas</h6>
+                                <h3 class="text-white mb-0 fw-bold">R$ <span th:text="${lucroVendas != null ? #numbers.formatDecimal(lucroVendas, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-gem text-info icon-large-side glow-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="text-info small fw-bold mb-3 text-uppercase"><i class="bi bi-tools me-2"></i>Movimento de Serviços</h5>
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="card p-4 h-100 shark-card border-left-success">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-success small fw-bold text-uppercase mb-2">O.S Bruto</h6>
+                                <h3 class="text-white mb-0 fw-bold">R$ <span th:text="${totalServicosBruto != null ? #numbers.formatDecimal(totalServicosBruto, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-graph-up text-success icon-large-side glow-success"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-4 h-100 shark-card border-left-danger">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-danger small fw-bold text-uppercase mb-2">Gasto Peças</h6>
+                                <h3 class="text-danger mb-0 fw-bold">R$ <span th:text="${custoPecasOS != null ? #numbers.formatDecimal(custoPecasOS, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-wrench-adjustable text-danger icon-large-side glow-danger"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-4 h-100 shark-card border-left-info" style="background: linear-gradient(45deg, #0b222e, #1a1a1a);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-info small fw-bold text-uppercase mb-2">Lucro em Serviços</h6>
+                                <h3 class="text-white mb-0 fw-bold">R$ <span th:text="${lucroServicos != null ? #numbers.formatDecimal(lucroServicos, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-lightning-charge-fill text-info icon-large-side glow-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="text-danger small fw-bold mb-3 text-uppercase"><i class="bi bi-cash-stack me-2"></i>Movimento de Despesas (Contas Pagas)</h5>
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="card p-4 h-100 shark-card border-left-danger">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-danger small fw-bold text-uppercase mb-2">Total Despesas do Mês</h6>
+                                <h3 class="text-white mb-0 fw-bold">R$ <span th:text="${totalDespesas != null ? #numbers.formatDecimal(totalDespesas, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-arrow-down-circle text-danger icon-large-side glow-danger"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-4 h-100 shark-card border-left-success">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-success small fw-bold text-uppercase mb-2">Saldo Após Despesas</h6>
+                                <h3 class="text-white mb-0 fw-bold">R$ <span th:text="${lucroFinalPosContas != null ? #numbers.formatDecimal(lucroFinalPosContas, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span></h3>
+                            </div>
+                            <i class="bi bi-wallet2 text-success icon-large-side glow-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-5">
+                <div class="col-12">
+                    <div class="card p-4 shadow-lg shark-card border-left-total" style="background: linear-gradient(90deg, #000, #111);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="text-success fw-bold text-uppercase mb-1">
+                                    <span class="rocket-animate" style="font-size: 2.5rem;">💰</span> Resultado Líquido Final do Mês
+                                </h5>
+                                <p class="text-white-50 small mb-0">(Lucro Total - Despesas Pagas)</p>
+                            </div>
+                            <div class="text-end">
+                                <h1 class="text-white mb-0 fw-bold text-glow" style="font-size: 4rem;">
+                                    R$ <span th:text="${lucroFinalPosContas != null ? #numbers.formatDecimal(lucroFinalPosContas, 1, 'POINT', 2, 'COMMA') : '0,00'}"></span>
+                                </h1>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div th:if="${mesReferencia == null}" class="text-center py-5 shark-table-card border-dashed" style="border-style: dashed !important; opacity: 0.6;">
+            <i class="bi bi-calendar-check fs-1 mb-3 d-block text-success glow-success"></i>
+            <h5 class="text-white">Fechamento Mensal Shark</h5>
+            <p class="text-white-50 small">Selecione o mês acima para consolidar o balanço de Vendas, Serviços e Despesas.</p>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

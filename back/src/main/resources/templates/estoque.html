@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Estoque - Shark Eletrônicos</title>
+    <style>
+        .shark-card {
+            background: #1a1a1a;
+            border-radius: 15px;
+            border: none;
+            border-left: 5px solid #333;
+            transition: all 0.3s ease;
+        }
+        .shark-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            filter: brightness(1.2);
+        }
+        .border-left-danger { border-left-color: #dc3545 !important; }
+        .border-left-info { border-left-color: #0dcaf0 !important; }
+        .border-left-success { border-left-color: #198754 !important; }
+
+        .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
+
+        .btn-readonly {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+            filter: grayscale(1);
+        }
+    </style>
+</head>
+
+<body>
+<div layout:fragment="conteudo">
+    <div class="mt-2">
+        <div class="mb-4">
+            <h2 class="fw-bold mb-0 text-white"><i class="bi bi-box-seam glow-info" style="color: #0dcaf0"></i> Controle de Estoque</h2>
+            <p class="text-white-50 small">Gerencie entrada, saída e performance financeira do seu inventário</p>
+        </div>
+
+        <div class="card shark-card border-left-info shadow-lg mb-4" style="background: rgba(15, 23, 42, 0.6) !important;">
+            <div class="card-body p-4">
+                <form th:action="@{/estoque/salvar}" method="post" id="formEstoque" class="row g-3 align-items-end">
+
+                    <input type="hidden" id="campoId" name="id">
+
+                    <div class="col-md-2">
+                        <label class="form-label text-info small fw-bold text-uppercase">Cód. Barras / SKU</label>
+                        <input id="campoCodigoBarras" name="codigoBarras" class="form-control bg-black text-white border-secondary shadow-none"
+                               placeholder="Ex: 789..." onchange="verificarDuplicidade(this.value)">
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label text-info small fw-bold text-uppercase">Nome do Produto</label>
+                        <input id="campoNome" name="nome" class="form-control bg-black text-white border-secondary shadow-none" placeholder="Ex: Teclado Mecânico" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-info small fw-bold text-uppercase">Custo (Und)</label>
+                        <input id="campoPrecoCusto" name="precoCusto" type="number" step="0.01" class="form-control bg-black text-white border-secondary shadow-none" placeholder="0.00" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-info small fw-bold text-uppercase">Venda (Und)</label>
+                        <input id="campoPrecoVenda" name="precoVenda" type="number" step="0.01" class="form-control bg-black text-white border-secondary shadow-none" placeholder="0.00" required>
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label text-info small fw-bold text-uppercase">Qtd</label>
+                        <input id="campoQtd" name="quantidade" type="number" class="form-control bg-black text-white border-secondary shadow-none" value="1" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <div class="d-flex gap-2">
+                            <button type="submit" id="btnAcao" class="btn btn-info w-100 fw-bold"
+                                    th:classappend="${#authorization.expression('hasRole(''ADMIN'')')} ? '' : 'btn-readonly'">
+                                <i class="bi bi-plus-circle"></i> SALVAR
+                            </button>
+                            <button type="button" id="btnCancelar" class="btn btn-outline-secondary d-none" onclick="limparFormulario()">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card p-3 shark-card border-left-danger shadow-sm">
+                    <p class="text-danger small fw-bold mb-1 text-uppercase">Total Investido</p>
+                    <h3 class="fw-bold text-white mb-0"
+                        th:text="${'R$ ' + #numbers.formatDecimal(#aggregates.sum(produtos.![precoCusto * quantidade]) ?: 0, 1, 'POINT', 2, 'COMMA')}">
+                    </h3>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card p-3 shark-card border-left-success shadow-sm">
+                    <p class="text-success small fw-bold mb-1 text-uppercase">Faturamento Bruto Previsto</p>
+                    <h3 class="fw-bold text-white mb-0"
+                        th:text="${'R$ ' + #numbers.formatDecimal(#aggregates.sum(produtos.![precoVenda * quantidade]) ?: 0, 1, 'POINT', 2, 'COMMA')}">
+                    </h3>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card p-3 shark-card border-left-info shadow-sm"
+                     th:with="totalCusto=${#aggregates.sum(produtos.![precoCusto * quantidade]) ?: 0},
+                              totalVenda=${#aggregates.sum(produtos.![precoVenda * quantidade]) ?: 0},
+                              lucroTotal=${totalVenda - totalCusto}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="text-info small fw-bold mb-1 text-uppercase">Lucro Líquido Previsto</p>
+                            <h3 class="fw-bold text-white mb-0"
+                                th:text="${'R$ ' + #numbers.formatDecimal(lucroTotal, 1, 'POINT', 2, 'COMMA')}">
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-lg border-0 bg-dark text-white mb-5" style="border-radius: 15px; overflow: hidden; border-left: 5px solid #333 !important;">
+            <div class="table-responsive">
+                <table class="table table-hover table-dark mb-0 align-middle text-center">
+                    <thead class="bg-black text-muted text-uppercase small">
+                    <tr>
+                        <th class="ps-4 text-start">CÓD/SKU</th>
+                        <th class="text-start">PRODUTO</th>
+                        <th>QTD</th>
+                        <th>CUSTO (UND)</th>
+                        <th>VENDA (UND)</th>
+                        <th>LUCRO (UND)</th>
+                        <th>AÇÕES</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="p : ${produtos}">
+                        <td class="ps-4 text-start fw-bold text-info" th:text="${p.codigoBarras ?: 'S/C'}"></td>
+                        <td class="text-start fw-bold" th:text="${p.nome}"></td>
+                        <td class="fw-bold" th:text="${p.quantidade}"></td>
+                        <td class="text-danger" th:text="${'R$ ' + #numbers.formatDecimal(p.precoCusto, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-success fw-bold" th:text="${'R$ ' + #numbers.formatDecimal(p.precoVenda, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-info fw-bold" th:text="${'R$ ' + #numbers.formatDecimal(p.precoVenda - p.precoCusto, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-center">
+                            <div class="btn-group gap-1">
+                                <button type="button" class="btn btn-sm btn-outline-info btn-editar-estoque"
+                                        th:classappend="${#authorization.expression('hasRole(''ADMIN'')')} ? '' : 'btn-readonly'"
+                                        th:data-id="${p.id}">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <form sec:authorize="hasRole('ADMIN')" th:action="@{/estoque/deletar/{id}(id=${p.id})}" method="post" style="display:inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remover da Shark?')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script th:inline="javascript">
+        const isAdmin = [[${#authorization.expression('hasRole("ADMIN")')}]];
+
+        document.querySelectorAll('.btn-editar-estoque').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (!isAdmin) {
+                    alert("Acesso Negado: Somente administradores podem editar.");
+                    return;
+                }
+                carregarParaEdicao(this.getAttribute('data-id'));
+            });
+        });
+
+        // VERIFICAÇÃO AUTOMÁTICA POR CÓDIGO DE BARRAS
+        function verificarDuplicidade(codigo) {
+            if (!codigo) return;
+            fetch('/estoque/buscar-por-codigo?codigo=' + codigo)
+                .then(response => {
+                    if (response.ok) return response.json();
+                    throw new Error('Novo');
+                })
+                .then(data => {
+                    const idAtual = document.getElementById('campoId').value;
+                    if (!idAtual || idAtual != data.id) {
+                        alert("Produto '" + data.nome + "' já cadastrado. Entrando em modo de EDIÇÃO.");
+                        carregarParaEdicao(data.id);
+                    }
+                })
+                .catch(() => { /* Segue como novo */ });
+        }
+
+        function carregarParaEdicao(id) {
+            fetch('/estoque/buscar/' + id)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('campoId').value = data.id;
+                    document.getElementById('campoCodigoBarras').value = data.codigoBarras;
+                    document.getElementById('campoNome').value = data.nome;
+                    document.getElementById('campoPrecoCusto').value = data.precoCusto;
+                    document.getElementById('campoPrecoVenda').value = data.precoVenda;
+                    document.getElementById('campoQtd').value = data.quantidade;
+
+                    document.getElementById('btnAcao').innerHTML = '<i class="bi bi-check-lg me-1"></i> ATUALIZAR';
+                    document.getElementById('btnCancelar').classList.remove('d-none');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+        }
+
+        function limparFormulario() {
+            document.getElementById('campoId').value = '';
+            document.getElementById('formEstoque').reset();
+            document.getElementById('btnAcao').innerHTML = '<i class="bi bi-plus-circle me-1"></i> SALVAR';
+            document.getElementById('btnCancelar').classList.add('d-none');
+        }
+    </script>
+</th:block>
+</body>
+</html>

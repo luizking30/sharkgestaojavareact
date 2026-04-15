@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Gestão de Clientes - Shark Eletrônicos</title>
+    <style>
+        .shark-card {
+            background: #1a1a1a;
+            border-radius: 15px;
+            border: none;
+            border-left: 5px solid #333;
+            transition: all 0.3s ease;
+        }
+        .shark-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            filter: brightness(1.2);
+        }
+        .border-left-info { border-left-color: #0dcaf0 !important; }
+        .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
+        .btn-link-shark:hover {
+            color: #0dcaf0 !important;
+            transform: scale(1.05);
+            display: inline-block;
+        }
+        .form-control { border-radius: 10px !important; }
+
+        .btn-readonly {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+            filter: grayscale(1);
+        }
+
+        .is-invalid-shark {
+            border-color: #dc3545 !important;
+            box-shadow: 0 0 10px rgba(220, 53, 69, 0.5) !important;
+        }
+    </style>
+</head>
+
+<body>
+<div layout:fragment="conteudo">
+    <div class="mt-2">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0 text-white">
+                    <i class="bi bi-people-fill glow-info" style="color: #0dcaf0"></i> Gestão de Clientes
+                </h2>
+                <p class="text-white-50 small">Administração de cadastros da Shark Eletrônicos | Brasília-DF</p>
+            </div>
+        </div>
+
+        <div th:if="${param.error}" class="alert alert-danger bg-dark text-danger border-danger shadow-lg">
+            <i class="bi bi-shield-lock-fill me-2"></i> Acesso negado: Somente administradores podem realizar esta ação.
+        </div>
+        <div th:if="${mensagemErro}" class="alert alert-warning alert-dismissible fade show bg-dark text-warning border-warning shadow-lg" role="alert">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i>
+            <span th:text="${mensagemErro}"></span>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div class="card shark-card border-left-info shadow-lg mb-4" style="background: rgba(15, 23, 42, 0.6) !important;">
+            <div class="card-header border-0 bg-transparent pt-4 pb-0">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-person-plus me-2" style="color: #0dcaf0"></i>Dados do Cliente
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" th:action="@{/clientes/salvar}" class="row g-3" id="formCliente">
+                    <input type="hidden" name="id" id="clienteId">
+
+                    <div class="col-md-5">
+                        <label class="form-label text-info small fw-bold mb-1 text-uppercase">Nome Completo</label>
+                        <input name="nome" id="nome" class="form-control bg-black text-white border-secondary shadow-none p-2"
+                               placeholder="Digite para cadastrar ou filtrar..." required minlength="5">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-info small fw-bold mb-1 text-uppercase">CPF</label>
+                        <input name="cpf" id="cpf" class="form-control bg-black text-white border-secondary shadow-none p-2"
+                               placeholder="000.000.000-00" maxlength="14" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-info small fw-bold mb-1 text-uppercase">WhatsApp</label>
+                        <div class="d-flex gap-2">
+                            <input name="whatsapp" id="whatsapp" class="form-control bg-black text-white border-secondary shadow-none p-2"
+                                   placeholder="(61) 99999-9999" maxlength="15" required>
+                            <button type="submit" id="btnSalvar" class="btn btn-info fw-bold px-3">SALVAR</button>
+                        </div>
+                    </div>
+
+                    <div class="col-12 mt-3 d-flex justify-content-between align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" onclick="limparFormulario()">
+                            <i class="bi bi-eraser me-2"></i> Limpar Campos
+                        </button>
+                        <span id="msgDuplicado" class="text-danger small fw-bold" style="display: none;">
+                            <i class="bi bi-exclamation-triangle"></i> Cadastro já existente (CPF ou WhatsApp)!
+                        </span>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card bg-dark border-0 shadow-sm overflow-hidden mb-5" style="border-radius: 15px; border-left: 5px solid #0dcaf0 !important;">
+            <div class="table-responsive">
+                <table class="table table-hover table-dark mb-0">
+                    <thead class="bg-black text-muted small text-uppercase">
+                    <tr>
+                        <th class="ps-4 py-3">ID</th>
+                        <th>NOME</th>
+                        <th>CPF</th>
+                        <th>CONTATO</th>
+                        <th class="text-center pe-4">AÇÕES</th>
+                    </tr>
+                    </thead>
+                    <tbody id="corpoTabela">
+                    <tr th:each="c : ${clientes}" class="align-middle linha-cliente">
+                        <td class="ps-4 fw-bold text-info td-id" th:text="'#' + ${c.id}"></td>
+                        <td class="fw-bold text-white td-nome" th:text="${c.nome}"></td>
+                        <td class="td-cpf" th:text="${c.cpf}"></td>
+                        <td class="td-whatsapp">
+                            <a th:href="'https://wa.me/55' + ${#strings.replace(#strings.replace(#strings.replace(#strings.replace(c.whatsapp, '(', ''), ') ', ''), '-', ''), ' ', '')}"
+                               target="_blank" class="text-success text-decoration-none fw-bold btn-link-shark">
+                                <i class="bi bi-whatsapp"></i> <span th:text="${c.whatsapp}"></span>
+                            </a>
+                        </td>
+                        <td class="text-center pe-4">
+                            <div class="d-flex justify-content-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-info btn-editar"
+                                        th:classappend="${#authorization.expression('hasRole(''ADMIN'')')} ? '' : 'btn-readonly'"
+                                        th:data-id="${c.id}" th:data-nome="${c.nome}" th:data-cpf="${c.cpf}" th:data-whatsapp="${c.whatsapp}">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <form th:action="@{/clientes/deletar/{id}(id=${c.id})}" method="post" class="m-0 form-deletar">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            th:classappend="${#authorization.expression('hasRole(''ADMIN'')')} ? '' : 'btn-readonly'">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const isAdmin = [[${#authorization.expression('hasRole("ADMIN")')}]];
+        const inputNome = document.getElementById("nome");
+        const inputCpf = document.getElementById("cpf");
+        const inputWhats = document.getElementById("whatsapp");
+        const btnSalvar = document.getElementById("btnSalvar");
+        const msgDuplicado = document.getElementById("msgDuplicado");
+
+        // --- BUSCA UNIVERSAL ---
+        function filtrarTabela() {
+            const termoNome = inputNome.value.toLowerCase();
+            const termoCpf = inputCpf.value.toLowerCase();
+            const termoWhats = inputWhats.value.toLowerCase();
+            const linhas = document.querySelectorAll(".linha-cliente");
+
+            linhas.forEach(linha => {
+                const txtNome = linha.querySelector(".td-nome").textContent.toLowerCase();
+                const txtCpf = linha.querySelector(".td-cpf").textContent.toLowerCase();
+                const txtWhats = linha.querySelector(".td-whatsapp").textContent.toLowerCase();
+
+                const bateNome = txtNome.includes(termoNome);
+                const bateCpf = txtCpf.includes(termoCpf);
+                const bateWhats = txtWhats.includes(termoWhats);
+
+                linha.style.display = (bateNome && bateCpf && bateWhats) ? "" : "none";
+            });
+        }
+
+        // --- VERIFICAÇÃO DE DUPLICIDADE ---
+        function verificarDuplicidade() {
+            const idAtual = document.getElementById("clienteId").value;
+            const cpfLimpado = inputCpf.value.trim();
+            const whatsLimpado = inputWhats.value.trim();
+            const linhas = document.querySelectorAll(".linha-cliente");
+            let existe = false;
+
+            linhas.forEach(linha => {
+                const idLinha = linha.querySelector(".td-id").textContent.replace("#", "");
+                const cpfLinha = linha.querySelector(".td-cpf").textContent.trim();
+                const whatsLinha = linha.querySelector(".td-whatsapp").textContent.trim();
+
+                if (idLinha !== idAtual) {
+                    if ((cpfLimpado !== "" && cpfLinha === cpfLimpado) ||
+                        (whatsLimpado !== "" && whatsLinha === whatsLimpado)) {
+                        existe = true;
+                    }
+                }
+            });
+
+            if (existe) {
+                inputCpf.classList.add("is-invalid-shark");
+                inputWhats.classList.add("is-invalid-shark");
+                btnSalvar.disabled = true;
+                msgDuplicado.style.display = "inline";
+            } else {
+                inputCpf.classList.remove("is-invalid-shark");
+                inputWhats.classList.remove("is-invalid-shark");
+                btnSalvar.disabled = false;
+                msgDuplicado.style.display = "none";
+            }
+        }
+
+        // Eventos
+        inputNome.addEventListener("input", function() {
+            this.value = this.value.replace(/[0-9]/g, "");
+            filtrarTabela();
+        });
+
+        inputCpf.addEventListener("input", function(e) {
+            let v = e.target.value.replace(/\D/g, "");
+            v = v.replace(/(\d{3})(\d)/, "$1.$2");
+            v = v.replace(/(\d{3})(\d)/, "$1.$2");
+            v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+            e.target.value = v;
+            filtrarTabela();
+            verificarDuplicidade();
+        });
+
+        inputWhats.addEventListener("input", function(e) {
+            let v = e.target.value.replace(/\D/g, "");
+            if (v.length > 0) v = "(" + v;
+            if (v.length > 3) v = v.substring(0, 3) + ") " + v.substring(3);
+            if (v.length > 9) v = v.substring(0, 10) + "-" + v.substring(10);
+            e.target.value = v;
+            filtrarTabela();
+            verificarDuplicidade();
+        });
+
+        // Botão Editar
+        document.querySelectorAll('.btn-editar').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (!isAdmin) { alert("Ação restrita a Administradores."); return; }
+                document.getElementById("clienteId").value = this.getAttribute('data-id');
+                document.getElementById("nome").value = this.getAttribute('data-nome');
+                document.getElementById("cpf").value = this.getAttribute('data-cpf');
+                document.getElementById("whatsapp").value = this.getAttribute('data-whatsapp');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                verificarDuplicidade();
+                filtrarTabela();
+            });
+        });
+
+        function limparFormulario() {
+            document.getElementById("formCliente").reset();
+            document.getElementById("clienteId").value = "";
+            document.querySelectorAll(".linha-cliente").forEach(l => l.style.display = "");
+            verificarDuplicidade();
+        }
+    </script>
+</div>
+</body>
+</html>

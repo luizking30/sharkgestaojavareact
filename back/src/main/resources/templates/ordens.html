@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Ordens de OS - Shark Eletrônicos</title>
+    <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}"/>
+    <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : 'X-CSRF-TOKEN'}"/>
+
+    <style>
+        .shark-card {
+            background: #1a1a1a;
+            border-radius: 15px;
+            border: none;
+            border-left: 5px solid #333;
+            transition: all 0.3s ease;
+        }
+        .shark-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            filter: brightness(1.2);
+        }
+        .border-left-info { border-left-color: #0dcaf0 !important; }
+        .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
+
+        /* CORREÇÃO DO ÍCONE DO CALENDÁRIO NO MODO DARK */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1); /* Deixa o ícone branco para aparecer no fundo preto */
+            cursor: pointer;
+        }
+
+        /* LISTA DE SUGESTÕES */
+        .sugestoes-wrapper {
+            background-color: #121212 !important;
+            border: 2px solid #0dcaf0 !important;
+            border-radius: 0 0 10px 10px;
+            max-height: 350px;
+            overflow-y: auto;
+            z-index: 999999 !important;
+            margin-top: 1px;
+            display: none;
+            position: absolute;
+            width: 100%;
+            left: 0;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.9);
+        }
+        .suggestion-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #222;
+            cursor: pointer !important;
+            transition: all 0.2s;
+            color: #ccc;
+            background-color: #121212 !important;
+            position: relative;
+            z-index: 1000001;
+            pointer-events: auto !important;
+        }
+        .suggestion-item:hover {
+            background-color: #1a1a1a !important;
+            border-left: 3px solid #0dcaf0;
+        }
+
+        .erro-cliente-msg {
+            color: #ff4444;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .form-control-plaintext.shark-info {
+            background-color: #080808 !important;
+            border: 1px solid #222 !important;
+            color: #0dcaf0 !important;
+            font-weight: bold;
+            padding: 0.75rem;
+            border-radius: 10px;
+        }
+
+        .status-select-ajax {
+            background-color: #000 !important;
+            color: #fff !important;
+            border-color: #333;
+        }
+        .form-control, .form-select {
+            border-radius: 10px !important;
+        }
+        input:focus, select:focus {
+            box-shadow: 0 0 10px rgba(13, 202, 240, 0.3) !important;
+            border-color: #0dcaf0 !important;
+        }
+
+        /* ESTILOS DE FINANCEIRO PADRÃO SHARK */
+        .valor-bruto-label {
+            font-size: 0.85rem;
+            color: #28a745 !important; /* VERDE */
+            font-weight: bold;
+        }
+        .gasto-pecas-label {
+            display: block;
+            font-size: 0.75rem;
+            color: #dc3545 !important; /* VERMELHO */
+            font-weight: bold;
+            margin-top: 2px;
+        }
+        .lucro-liquido-label {
+            display: block;
+            font-size: 0.75rem;
+            color: #0dcaf0 !important; /* CIANO */
+            font-weight: bold;
+        }
+
+        .auditoria-wrapper {
+            font-size: 0.68rem;
+            line-height: 1.4;
+            color: #aaa;
+        }
+        .auditoria-item i {
+            font-size: 0.75rem;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+
+<body>
+<div layout:fragment="conteudo">
+
+    <div class="mt-2">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0 text-white">
+                    <i class="bi bi-tools glow-info" style="color: #0dcaf0"></i> Ordens de Serviço
+                </h2>
+                <p class="text-white-50 small">Gerenciamento Shark Eletrônicos | Brasília-DF</p>
+            </div>
+        </div>
+
+        <div class="card shark-card border-left-info shadow-lg mb-4" style="background: rgba(15, 23, 42, 0.6) !important; z-index: 1000; position: relative;">
+            <div class="card-header border-0 bg-transparent py-3">
+                <h5 class="card-title mb-0 text-white"><i class="bi bi-plus-lg me-2 text-info"></i>Nova O.S.</h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" th:action="@{/ordens}" class="row g-3" id="formCriarOrdem" style="overflow: visible;">
+                    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                    <input type="hidden" name="status" value="Em análise">
+
+                    <div class="col-md-3 position-relative" style="z-index: 1001;">
+                        <label class="form-label text-info small fw-bold text-uppercase">Cliente</label>
+                        <input type="text" id="inputClienteForm" class="form-control bg-black text-white border-secondary shadow-none p-3"
+                               placeholder="Clique para ver recentes..." autocomplete="off" required>
+                        <input type="hidden" name="clienteId" id="clienteIdHidden">
+                        <div id="msgErroCliente" class="erro-cliente-msg">⚠️ Selecione um cliente da lista!</div>
+                        <div id="box-sugestoes-cliente" class="list-group sugestoes-wrapper"></div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-info small fw-bold text-uppercase">CPF do Cliente</label>
+                        <input type="text" id="displayCpf" class="form-control-plaintext shark-info p-3" readonly placeholder="---">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-info small fw-bold text-uppercase">Contato</label>
+                        <input type="text" id="displayWhatsapp" class="form-control-plaintext shark-info p-3" readonly placeholder="---">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-info small fw-bold text-uppercase">Equipamento</label>
+                        <input name="produto" class="form-control bg-black text-white border-secondary shadow-none p-3" placeholder="Ex: PS5" required>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label text-info small fw-bold text-uppercase">Defeito</label>
+                        <input name="defeito" class="form-control bg-black text-white border-secondary shadow-none p-3" placeholder="Ex: Sem imagem" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label text-info small fw-bold text-uppercase">Valor Total (R$)</label>
+                        <input type="number" step="0.01" min="0" id="inputValorTotal" name="valor" class="form-control bg-black text-white border-secondary shadow-none p-3" placeholder="0.00" required>
+                    </div>
+
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-info w-100 fw-bold p-3">
+                            <i class="bi bi-check2-circle me-1"></i> SALVAR O.S.
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shark-card border-left-info shadow-lg mb-4" style="background: rgba(15, 23, 42, 0.4) !important; z-index: 1;">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-4 text-white">
+                    <i class="bi bi-search me-2 text-info"></i>BUSCAR O.S.
+                </h5>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-1">
+                        <label class="form-label text-info small fw-bold mb-1 text-uppercase">ID</label>
+                        <input type="text" id="buscaId" class="form-control bg-black text-white border-secondary shadow-none p-3" placeholder="#">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label text-info small fw-bold mb-1 text-uppercase">Cliente</label>
+                        <input type="text" id="buscaNome" class="form-control bg-black text-white border-secondary shadow-none p-3" placeholder="Filtrar por nome...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-info small fw-bold mb-1 text-uppercase">Data</label>
+                        <input type="date" id="buscaData" class="form-control bg-black text-white border-secondary shadow-none p-3">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-info small fw-bold mb-1 text-uppercase">Status</label>
+                        <select id="buscaStatus" class="form-select bg-black text-white border-secondary shadow-none p-3">
+                            <option value="">Todos os Status</option>
+                            <option value="Em análise">Em análise</option>
+                            <option value="Em andamento">Em andamento</option>
+                            <option value="Pronto">Pronto</option>
+                            <option value="Entregue">Entregue/Pago</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" id="btnReset" class="btn btn-outline-info w-100 p-3">
+                            <i class="bi bi-eraser-fill"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-dark border-0 shadow-sm overflow-hidden" style="border-radius: 15px; border-left: 5px solid #333 !important; z-index: 1;">
+            <div class="table-responsive">
+                <table class="table table-hover table-dark mb-0 align-middle">
+                    <thead class="bg-black text-white-50 text-uppercase small">
+                    <tr>
+                        <th class="ps-4" style="min-width: 220px;">ID / DATAS</th>
+                        <th>Cliente</th>
+                        <th>Equipamento</th>
+                        <th>Financeiro (R$)</th>
+                        <th>Status / Entrega</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tabelaCorpo">
+                    <tr th:each="o : ${ordens}" class="ordem-row">
+                        <td class="ps-4">
+                            <span class="fw-bold text-info os-id-label" th:text="'#' + ${o.id}"></span>
+                            <div class="auditoria-wrapper mt-1">
+                                <div class="auditoria-item small">
+                                    <i class="bi bi-person-plus text-info"></i> Aberta por: <span th:text="${o.funcionarioAbertura ?: 'Sistema'}"></span> em <span th:text="${#temporals.format(o.data, 'dd/MM/yy HH:mm')}"></span>
+                                </div>
+                                <div class="auditoria-item small" th:if="${o.dataAndamento != null}" style="color: #0dcaf0;">
+                                    <i class="bi bi-play-circle"></i> Iniciada por: <span th:text="${o.funcionarioAndamento}"></span> em <span th:text="${#temporals.format(o.dataAndamento, 'dd/MM/yy HH:mm')}"></span>
+                                </div>
+                                <div class="auditoria-item small text-success" th:if="${o.dataEntrega != null}">
+                                    <i class="bi bi-check-all"></i> Entregue por: <span th:text="${o.funcionarioEntrega}"></span> em <span th:text="${#temporals.format(o.dataEntrega, 'dd/MM/yy HH:mm')}"></span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="cliente-nome-col">
+                            <div class="fw-bold text-white" th:text="${o.clienteNome}"></div>
+                            <div class="small text-white-50 mb-1" th:text="'CPF: ' + ${o.clienteCpf ?: '---'}"></div>
+                            <a th:if="${o.clienteWhatsapp != null}"
+                               th:href="'https://wa.me/55' + ${#strings.replace(#strings.replace(#strings.replace(o.clienteWhatsapp, '(', ''), ')', ''), '-', '')}"
+                               target="_blank"
+                               class="fw-bold text-decoration-none"
+                               style="color: #25D366; font-size: 0.85rem;">
+                                <i class="bi bi-whatsapp me-1"></i><span th:text="${o.clienteWhatsapp}"></span>
+                            </a>
+                        </td>
+                        <td>
+                            <span class="text-white" th:text="${o.produto}"></span><br>
+                            <small class="text-info d-block mb-1" th:text="${o.defeito}"></small>
+                        </td>
+                        <td>
+                            <div class="valor-bruto-wrapper">
+                                <span class="text-white small">Valor:</span>
+                                <span class="valor-bruto-label valor-total-exibido" th:id="'valor-total-' + ${o.id}"
+                                      th:text="${o.valorTotal != null ? 'R$ ' + #numbers.formatDecimal(o.valorTotal, 1, 'POINT', 2, 'COMMA') : 'R$ 0,00'}"></span>
+                            </div>
+
+                            <div th:id="'container-custo-' + ${o.id}" th:style="${o.custoPeca != null && o.custoPeca > 0 ? 'display:block' : 'display:none'}">
+                                <span class="text-white small">Custo:</span>
+                                <span class="gasto-pecas-label d-inline" th:id="'gasto-pecas-' + ${o.id}"
+                                      th:text="${o.custoPeca != null ? '- R$ ' + #numbers.formatDecimal(o.custoPeca, 1, 'POINT', 2, 'COMMA') : ''}"></span>
+                            </div>
+
+                            <div th:id="'container-lucro-' + ${o.id}" th:style="${o.custoPeca != null && o.custoPeca > 0 ? 'display:block' : 'display:none'}">
+                                <span class="text-white small">Lucro:</span>
+                                <span class="lucro-liquido-label d-inline" th:id="'lucro-liquido-' + ${o.id}"
+                                      th:text="${o.custoPeca != null ? '= R$ ' + #numbers.formatDecimal(o.valorTotal - o.custoPeca, 1, 'POINT', 2, 'COMMA') : ''}"></span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge mb-1 d-block status-badge-text" th:id="'badge-' + ${o.id}" th:text="${o.status}"
+                                  th:classappend="${o.status == 'Em análise' ? 'bg-warning text-dark' : (o.status == 'Em andamento' ? 'bg-primary' : (o.status == 'Pronto' ? 'bg-info text-dark' : 'bg-success'))}">
+                            </span>
+
+                            <div th:if="${o.status == 'Entregue' and o.dataEntrega != null}" class="text-center mb-1">
+                                <small class="text-success fw-bold">
+                                    <i class="bi bi-calendar-check-fill me-1"></i>
+                                    <span th:text="${#temporals.format(o.dataEntrega, 'dd/MM/yy HH:mm')}"></span>
+                                </small>
+                            </div>
+
+                            <select class="form-select form-select-sm status-select-ajax shadow-none"
+                                    th:attr="data-id=${o.id}, data-status-atual=${o.status}, data-valor-total=${o.valorTotal}">
+                                <option value="Em análise" th:selected="${o.status == 'Em análise'}" th:disabled="${o.status != 'Em análise'}">Em análise</option>
+                                <option value="Em andamento" th:selected="${o.status == 'Em andamento'}" th:disabled="${o.status != 'Em análise' && o.status != 'Em andamento'}">Em andamento</option>
+                                <option value="Pronto" th:selected="${o.status == 'Pronto'}" th:disabled="${o.status != 'Em andamento' && o.status != 'Pronto'}">Pronto</option>
+                                <option value="Entregue" th:selected="${o.status == 'Entregue'}" th:disabled="${o.status != 'Pronto' && o.status != 'Entregue'}">Entregue/Pago</option>
+                            </select>
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group">
+                                <a class="btn btn-sm btn-outline-info p-2" th:href="@{/ordens/pdf/{id}(id=${o.id})}" target="_blank">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+                                <button sec:authorize="hasRole('ADMIN')" class="btn btn-sm btn-outline-danger p-2 btn-deletar" th:attr="data-id=${o.id}">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = document.querySelector('meta[name="_csrf"]')?.content;
+            const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+            const inputCli = document.getElementById('inputClienteForm');
+            const hiddenCliId = document.getElementById('clienteIdHidden');
+            const boxCli = document.getElementById('box-sugestoes-cliente');
+            const displayCpf = document.getElementById('displayCpf');
+            const displayWhatsapp = document.getElementById('displayWhatsapp');
+            const formOS = document.getElementById('formCriarOrdem');
+            const msgErro = document.getElementById('msgErroCliente');
+
+            // --- BUSCA DE CLIENTES (AUTOCOMPLETE) ---
+            function buscarClientes(termo = "") {
+                fetch(`/clientes/sugestoes?termo=${encodeURIComponent(termo)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        boxCli.innerHTML = '';
+                        if (data && data.length > 0) {
+                            data.forEach(c => {
+                                const div = document.createElement('div');
+                                div.className = 'suggestion-item';
+                                div.innerHTML = `
+                                    <div class="fw-bold text-info">${c.nome}</div>
+                                    <div class="d-flex gap-3" style="font-size: 0.75rem; margin-top: 2px;">
+                                        <span class="text-muted"><i class="bi bi-card-text me-1"></i>${c.cpf || 'Sem CPF'}</span>
+                                        <span style="color: #25D366;"><i class="bi bi-whatsapp me-1"></i>${c.whatsapp || 'Sem contato'}</span>
+                                    </div>
+                                `;
+                                div.addEventListener('mousedown', function(e) {
+                                    e.preventDefault();
+                                    inputCli.value = c.nome;
+                                    hiddenCliId.value = c.id;
+                                    displayCpf.value = c.cpf || 'Não informado';
+                                    displayWhatsapp.value = c.whatsapp || 'Não informado';
+                                    boxCli.style.display = 'none';
+                                    msgErro.style.display = 'none';
+                                    inputCli.style.borderColor = '';
+                                });
+                                boxCli.appendChild(div);
+                            });
+                            boxCli.style.display = 'block';
+                        } else {
+                            boxCli.style.display = 'none';
+                        }
+                    });
+            }
+
+            inputCli.addEventListener('focus', () => buscarClientes(inputCli.value.trim()));
+            inputCli.addEventListener('input', () => {
+                hiddenCliId.value = '';
+                displayCpf.value = '---';
+                displayWhatsapp.value = '---';
+                buscarClientes(inputCli.value.trim());
+            });
+            inputCli.addEventListener('blur', () => setTimeout(() => boxCli.style.display = 'none', 200));
+
+            formOS.addEventListener('submit', function(e) {
+                if (!hiddenCliId.value) {
+                    e.preventDefault();
+                    msgErro.style.display = 'block';
+                    inputCli.style.borderColor = '#ff4444';
+                    inputCli.focus();
+                }
+            });
+
+            // --- LÓGICA DE ALTERAÇÃO DE STATUS E CÁLCULO DE LUCRO ---
+            document.querySelectorAll('.status-select-ajax').forEach(select => {
+                const isAdmin = [[${#authorization.expression('hasRole(''ADMIN'')')}]];
+                const tipoFuncionario = [[${usuarioLogado != null ? usuarioLogado.tipoFuncionario : ''}]];
+                const podeOperarLaboratorio = isAdmin || tipoFuncionario === 'TECNICO' || tipoFuncionario === 'HIBRIDO';
+
+                select.addEventListener('change', function() {
+                    const id = this.getAttribute('data-id');
+                    const statusAtual = this.getAttribute('data-status-atual');
+                    const novoStatus = this.value;
+                    const valorTotal = parseFloat(this.getAttribute('data-valor-total')) || 0;
+                    const badge = document.getElementById('badge-' + id);
+
+                    if ((novoStatus === 'Em andamento' || novoStatus === 'Pronto') && !podeOperarLaboratorio) {
+                        alert("Acesso negado: Somente técnicos ou administradores podem iniciar ou finalizar serviços.");
+                        this.value = statusAtual;
+                        return;
+                    }
+
+                    const hierarquia = ['Em análise', 'Em andamento', 'Pronto', 'Entregue'];
+                    const idxAtual = hierarquia.indexOf(statusAtual);
+                    const idxNovo = hierarquia.indexOf(novoStatus);
+
+                    if (idxNovo < idxAtual) {
+                        alert("Não é permitido retroceder o status da O.S.");
+                        this.value = statusAtual;
+                        return;
+                    }
+                    if (idxNovo > idxAtual + 1) {
+                        alert(`A O.S. deve passar por "${hierarquia[idxAtual + 1]}" antes.`);
+                        this.value = statusAtual;
+                        return;
+                    }
+
+                    if (statusAtual === 'Entregue') {
+                        alert("Esta O.S. já foi finalizada!");
+                        this.value = 'Entregue';
+                        return;
+                    }
+
+                    let custoPeca = 0;
+                    if (novoStatus === 'Entregue') {
+                        const resposta = prompt("Informe o gasto com peças para calcular o lucro líquido (R$):", "0.00");
+                        if (resposta === null) {
+                            this.value = statusAtual;
+                            return;
+                        }
+                        custoPeca = parseFloat(resposta.replace(',', '.')) || 0;
+                    }
+
+                    const params = new URLSearchParams();
+                    params.append('id', id);
+                    params.append('status', novoStatus);
+                    params.append('custoPeca', custoPeca);
+
+                    fetch('/ordens/editar-status-ajax', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded', [header]: token },
+                        body: params.toString()
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            if(data.success) {
+                                location.reload();
+                            }
+                        });
+                });
+            });
+
+            // --- FILTROS E DELETE ---
+            document.querySelectorAll('.btn-deletar').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    if (confirm(`Excluir permanentemente a O.S. #${id}?`)) {
+                        fetch(`/ordens/deletar/${id}`, { method: 'DELETE', headers: { [header]: token } })
+                            .then(res => { if (res.ok) this.closest('tr').remove(); });
+                    }
+                });
+            });
+
+            const buscaId = document.getElementById('buscaId');
+            const buscaNome = document.getElementById('buscaNome');
+            const buscaData = document.getElementById('buscaData');
+            const buscaStatus = document.getElementById('buscaStatus');
+
+            function filtrar() {
+                const vId = buscaId.value.trim().replace('#', '').toLowerCase();
+                const vNome = buscaNome.value.trim().toLowerCase();
+                const vData = buscaData.value; // Formato yyyy-mm-dd
+                const vStatus = buscaStatus.value.toLowerCase();
+
+                document.querySelectorAll('.ordem-row').forEach(row => {
+                    const rId = row.querySelector('.os-id-label').innerText.replace('#', '').toLowerCase();
+                    const rNome = row.querySelector('.cliente-nome-col').innerText.toLowerCase();
+                    const rStatus = row.querySelector('.status-badge-text').innerText.toLowerCase();
+
+                    // Lógica para busca por data (compara ano-mês-dia)
+                    let matchData = true;
+                    if (vData) {
+                        // Tenta extrair a data da primeira linha da auditoria (data de abertura)
+                        // Note: Isso depende de como o Thymeleaf renderiza a data.
+                        // Se rData for dd/MM/yy, precisamos converter para comparar.
+                        // Para facilitar, estamos mantendo o filtro de texto padrão ou exato se preferir.
+                        const rDataRaw = row.querySelector('.auditoria-item span').innerText; // Ex: 05/04/26
+                        const [d, m, y] = rDataRaw.split(' ')[0].split('/');
+                        const rDataFormatada = `20${y}-${m}-${d}`;
+                        matchData = (rDataFormatada === vData);
+                    }
+
+                    row.style.display = (
+                        (vId === "" || rId === vId) &&
+                        (vNome === "" || rNome.includes(vNome)) &&
+                        matchData &&
+                        (vStatus === "" || rStatus === vStatus)
+                    ) ? "" : "none";
+                });
+            }
+            [buscaId, buscaNome, buscaData, buscaStatus].forEach(el => el.addEventListener('input', filtrar));
+            document.getElementById('btnReset').addEventListener('click', () => {
+                [buscaId, buscaNome, buscaData, buscaStatus].forEach(el => el.value = "");
+                filtrar();
+            });
+        });
+    </script>
+</div>
+</body>
+</html>

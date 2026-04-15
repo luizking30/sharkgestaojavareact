@@ -1,0 +1,140 @@
+/* src/Login.css */
+:root { 
+    --shark-blue: #0047ab; 
+    --shark-light-blue: #00d4ff; 
+    --shark-black: #020617; 
+    --shark-white: #f8fafc; 
+    --text-muted: #94a3b8; 
+    --shark-red: #ff4d4d; 
+    --shark-yellow: #ffcc00; 
+    --shark-green: #00ff88; 
+}
+
+/* Reset básico para não brigar com o Vite */
+.login-body { 
+    background: radial-gradient(circle at center, #001e4d 0%, var(--shark-black) 100%); 
+    font-family: 'Segoe UI', sans-serif; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    min-height: 100vh; 
+    margin: 0; 
+}
+
+.login-card { 
+    background: rgba(15, 23, 42, 0.85); 
+    backdrop-filter: blur(12px); 
+    padding: 40px; 
+    border-radius: 24px; 
+    color: var(--shark-white); 
+    width: 100%; 
+    max-width: 450px; 
+    box-shadow: 0 0 50px rgba(0, 212, 255, 0.2); 
+    border: 1px solid rgba(0, 212, 255, 0.3); 
+    text-align: center; 
+}
+
+.brand-logo { 
+    width: 300px; 
+    height: auto; 
+    margin-bottom: 10px; 
+    filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6)); 
+}
+
+/* Forçando os inputs a ficarem escuros como no original */
+.form-floating > .form-control { 
+    background-color: rgba(2, 6, 23, 0.8) !important; 
+    border: 1px solid #1e293b !important; 
+    color: white !important; 
+    border-radius: 12px !important;
+    height: 58px !important; /* Altura padrão do Bootstrap 5 */
+}
+
+/* Estilo do botão Shark */
+.btn-login { 
+    width: 100%; 
+    padding: 14px; 
+    background: var(--shark-blue); 
+    border: 1px solid var(--shark-light-blue); 
+    color: white; 
+    font-weight: 800; 
+    border-radius: 12px; 
+    text-transform: uppercase; 
+    letter-spacing: 1.5px; 
+    transition: 0.3s; 
+    cursor: pointer;
+}
+
+.btn-login:hover { 
+    background: var(--shark-white); 
+    color: var(--shark-blue); 
+    transform: translateY(-3px); 
+}
+
+.btn-toggle-reg { 
+    background: transparent; 
+    border: 1px dashed var(--text-muted); 
+    color: var(--text-muted); 
+    font-weight: 700; 
+    border-radius: 12px; 
+    padding: 12px; 
+    width: 100%; 
+    margin-top: 10px; 
+    cursor: pointer; 
+    transition: 0.3s; 
+    text-decoration: none; 
+    display: block; 
+    font-size: 0.85rem; 
+}
+
+.btn-toggle-reg:hover { 
+    border-color: var(--shark-light-blue); 
+    color: var(--shark-light-blue); 
+}
+
+.forgot-link { 
+    color: var(--text-muted); 
+    font-size: 0.75rem; 
+    text-decoration: none; 
+    font-weight: 600; 
+    transition: 0.3s; 
+    cursor: pointer; 
+}
+
+.forgot-link:hover { color: var(--shark-light-blue); }
+
+/* Ajuste das labels do Bootstrap */
+.form-floating label {
+    color: var(--text-muted) !important;
+}
+
+/* --- CLASSES DE VALIDAÇÃO E ERRO (ADICIONADAS) --- */
+
+.invalid-msg { 
+    color: var(--shark-red) !important; 
+    font-size: 0.75rem !important; 
+    text-align: left !important; 
+    margin: 5px 0 10px 10px !important; 
+    font-weight: 700 !important; 
+    display: block !important; /* Força a exibição mesmo com conflito de Bootstrap */
+}
+
+.is-invalid-shark { 
+    border-color: var(--shark-red) !important; 
+    box-shadow: 0 0 10px rgba(255, 77, 77, 0.3) !important;
+}
+
+.section-title { 
+    font-size: 0.75rem; 
+    color: var(--shark-light-blue); 
+    font-weight: 800; 
+    letter-spacing: 1.5px; 
+    margin: 20px 0 10px 5px; 
+    text-align: left; 
+    text-transform: uppercase; 
+}
+
+/* Garante que a label também mude de cor no erro */
+.is-invalid-shark ~ label {
+    color: var(--shark-red) !important;
+}

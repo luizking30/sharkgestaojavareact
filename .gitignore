@@ -1,0 +1,16 @@
+# Java compilado
+back/target/
+*.class
+
+# Configurações do IntelliJ
+.idea/
+back/.idea/
+*.iml
+
+# Bibliotecas do React (MUITO IMPORTANTE)
+front/node_modules/
+front/dist/
+
+# Logs e arquivos temporários
+*.log
+.DS_Store

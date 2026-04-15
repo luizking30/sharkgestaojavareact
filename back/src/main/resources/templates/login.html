@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Shark Eletrônicos</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --shark-blue: #0047ab; --shark-light-blue: #00d4ff; --shark-black: #020617; --shark-white: #f8fafc; --text-muted: #94a3b8; --shark-red: #ff4d4d; --shark-yellow: #ffcc00; --shark-green: #00ff88; }
+        body { background: radial-gradient(circle at center, #001e4d 0%, var(--shark-black) 100%); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .login-card { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); padding: 40px; border-radius: 24px; color: var(--shark-white); width: 100%; max-width: 420px; box-shadow: 0 0 50px rgba(0, 212, 255, 0.2); border: 1px solid rgba(0, 212, 255, 0.3); text-align: center; }
+        .brand-logo { width: 300px; height: auto; margin-bottom: 10px; filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6)); }
+        .form-floating > .form-control { background-color: rgba(2, 6, 23, 0.8) !important; border: 1px solid #1e293b !important; color: white !important; border-radius: 12px; }
+        .btn-login { width: 100%; padding: 14px; background: var(--shark-blue); border: 1px solid var(--shark-light-blue); color: white; font-weight: 800; border-radius: 12px; text-transform: uppercase; letter-spacing: 1.5px; transition: 0.3s; }
+        .btn-login:hover { background: var(--shark-white); color: var(--shark-blue); transform: translateY(-3px); }
+        .btn-toggle-reg { background: transparent; border: 1px dashed var(--text-muted); color: var(--text-muted); font-weight: 700; border-radius: 12px; padding: 12px; width: 100%; margin-top: 10px; cursor: pointer; transition: 0.3s; text-decoration: none; display: block; font-size: 0.85rem; }
+        .btn-toggle-reg:hover { border-color: var(--shark-light-blue); color: var(--shark-light-blue); }
+        .alert-custom { padding: 12px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid; }
+        .forgot-link { color: var(--text-muted); font-size: 0.75rem; text-decoration: none; font-weight: 600; transition: 0.3s; cursor: pointer; }
+        .forgot-link:hover { color: var(--shark-light-blue); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <div class="login-header text-center">
+        <img th:src="@{/images/logo.png}" alt="Shark Eletrônicos" class="brand-logo">
+        <p id="headerSub" style="color: var(--shark-light-blue); font-weight: 700;">GESTÃO EMPRESARIAL</p>
+    </div>
+
+    <div th:if="${param.error} and ${param.not_approved == null}" class="alert-custom" style="color: var(--shark-red); border-color: var(--shark-red); background: rgba(255, 77, 77, 0.1);">
+        <i class="bi bi-x-circle-fill"></i> <span>USUÁRIO OU SENHA INVÁLIDOS!</span>
+    </div>
+
+    <div th:if="${mensagemSucesso}" class="alert-custom" style="color: var(--shark-green); border-color: var(--shark-green); background: rgba(0, 255, 136, 0.1);">
+        <i class="bi bi-check-circle-fill"></i> <span th:text="${mensagemSucesso}"></span>
+    </div>
+
+    <div th:if="${sucessoRecuperacao}" class="alert-custom" style="color: var(--shark-green); border-color: var(--shark-green); background: rgba(0, 255, 136, 0.1);">
+        <i class="bi bi-envelope-check-fill"></i> <span th:text="${sucessoRecuperacao}"></span>
+    </div>
+
+    <div th:if="${mensagemErro}" class="alert-custom" style="color: var(--shark-red); border-color: var(--shark-red); background: rgba(255, 77, 77, 0.1);">
+        <i class="bi bi-exclamation-octagon-fill"></i> <span th:text="${mensagemErro}"></span>
+    </div>
+
+    <div th:if="${param.not_approved}" class="alert-custom" style="color: var(--shark-yellow); border-color: var(--shark-yellow); background: rgba(255, 204, 0, 0.1);">
+        <i class="bi bi-shield-lock-fill"></i> <span>CONTA PENDENTE DE APROVAÇÃO!</span>
+    </div>
+
+    <div id="loginSection">
+        <form th:action="@{/login}" method="post">
+            <div class="mb-2">
+                <span onclick="toggleRecovery()" class="forgot-link">Esqueceu sua senha?</span>
+            </div>
+            <div class="form-floating mb-3">
+                <input type="text" name="username" class="form-control" id="userInput" placeholder="Usuário" required>
+                <label for="userInput"><i class="bi bi-person me-2"></i>Login</label>
+            </div>
+            <div class="form-floating mb-4">
+                <input type="password" name="password" class="form-control" id="passInput" placeholder="Senha" required>
+                <label for="passInput"><i class="bi bi-key me-2"></i>Senha</label>
+            </div>
+            <button type="submit" class="btn-login">Acessar Painel</button>
+        </form>
+    </div>
+
+    <div id="recoverySection" class="hidden">
+        <h6 style="color: var(--shark-yellow); font-weight: 800; margin-bottom: 20px;">RECUPERAR ACESSO</h6>
+        <form th:action="@{/esqueci-senha}" method="post">
+            <div class="form-floating mb-4">
+                <input type="text" name="identificador" class="form-control" id="idenInput" placeholder="Login, E-mail ou Whats" required>
+                <label for="idenInput"><i class="bi bi-search me-2"></i>Login, E-mail ou Whats</label>
+            </div>
+            <button type="submit" class="btn-login mb-3">Enviar Link</button>
+            <div class="text-center">
+                <span onclick="toggleRecovery()" class="forgot-link" style="font-size: 0.85rem;"><i class="bi bi-arrow-left me-1"></i>Voltar ao Login</span>
+            </div>
+        </form>
+    </div>
+
+    <div id="actionButtons" class="mt-3">
+        <a th:href="@{/registro-funcionario}" class="btn-toggle-reg"><i class="bi bi-person-plus-fill me-2"></i>Novo Funcionário</a>
+        <a th:href="@{/registro-empresa}" class="btn-toggle-reg"><i class="bi bi-building-add me-2"></i>Nova Empresa</a>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    function toggleRecovery() {
+        const loginSec = document.getElementById('loginSection');
+        const recoverySec = document.getElementById('recoverySection');
+        const headerSub = document.getElementById('headerSub');
+        const actions = document.getElementById('actionButtons');
+
+        if (loginSec.classList.contains('hidden')) {
+            loginSec.classList.remove('hidden');
+            recoverySec.classList.add('hidden');
+            headerSub.innerText = "GESTÃO DE LOJA";
+            actions.style.display = "block";
+        } else {
+            loginSec.classList.add('hidden');
+            recoverySec.classList.remove('hidden');
+            headerSub.innerText = "RECUPERAÇÃO";
+            actions.style.display = "none";
+        }
+    }
+
+    window.onload = function() {
+        /*<![CDATA[*/
+        var sucessoRec = [[${sucessoRecuperacao}]];
+        var msgErro = [[${mensagemErro}]];
+
+        // Só abre a tela de recuperação automaticamente se houver sucesso ou erro NO PROCESSO DE RECUPERAÇÃO
+        if (sucessoRec != null || msgErro != null) {
+            const loginSec = document.getElementById('loginSection');
+            const recoverySec = document.getElementById('recoverySection');
+            const headerSub = document.getElementById('headerSub');
+            const actions = document.getElementById('actionButtons');
+
+            loginSec.classList.add('hidden');
+            recoverySec.classList.remove('hidden');
+            headerSub.innerText = "RECUPERAÇÃO";
+            actions.style.display = "none";
+        }
+        /*]]>*/
+    };
+</script>
+</body>
+</html>

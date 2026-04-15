@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+  <title>Gestão de Equipe - Shark Eletrônicos</title>
+  <th:block layout:fragment="estilos">
+    <style>
+      /* DESIGN SYSTEM SHARK UNIFICADO */
+      .shark-card {
+        background: #1a1a1a;
+        border-radius: 15px;
+        border: none;
+        border-left: 5px solid #333;
+        transition: all 0.3s ease;
+      }
+
+      .card-ganhos-stats {
+        background: rgba(30, 41, 59, 0.6);
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 1rem;
+        transition: 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%;
+        border-left: 4px solid #333;
+      }
+
+      .card-ganhos-stats:hover {
+        border-color: rgba(0, 212, 255, 0.3);
+        background: rgba(30, 41, 59, 0.8);
+        transform: translateY(-3px);
+      }
+
+      .border-left-info { border-left: 5px solid #0dcaf0 !important; }
+      .border-left-success { border-left: 5px solid #00c853 !important; }
+      .border-left-warning { border-left: 5px solid #ffc107 !important; }
+
+      .label-stats {
+        text-transform: uppercase;
+        font-size: 0.6rem;
+        letter-spacing: 1px;
+        color: #94a3b8;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+      .valor-bruto {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.1rem;
+        color: #fff;
+        font-weight: 700;
+      }
+      .valor-comissao {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1.3rem;
+        font-weight: 800;
+      }
+
+      .val-mono { font-family: 'JetBrains Mono', monospace !important; font-weight: 700; }
+
+      /* TABELA ESTILO GANHOS */
+      .table-shark-admin {
+        background: rgba(15, 23, 42, 0.5) !important;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .table-shark-admin thead {
+        background-color: #000;
+        color: #94a3b8;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+      }
+
+      .btn-pagar-venda { background: #0dcaf0; color: #000; border: none; font-weight: 700; font-size: 0.75rem; }
+      .btn-pagar-os { background: #198754; color: white; border: none; font-weight: 700; font-size: 0.75rem; }
+      .btn-pagar-venda:hover, .btn-pagar-os:hover { transform: scale(1.02); filter: brightness(1.1); }
+
+      .card-liquidado {
+        background: rgba(25, 135, 84, 0.1);
+        border: 1px solid #198754;
+        color: #198754;
+        padding: 5px;
+        border-radius: 6px;
+        font-weight: 800;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+      }
+
+      .badge-data-pgto {
+        background: #000;
+        border: 1px solid #333;
+        font-size: 0.6rem;
+        min-width: 50px;
+        text-align: center;
+        padding: 4px;
+        border-radius: 5px;
+      }
+
+      /* FIX MODAL */
+      .modal-shark-content { background: #111 !important; border: 1px solid #444 !important; color: white !important; border-radius: 15px; }
+      .modal-backdrop { display: none !important; }
+      .modal { background: rgba(0, 0, 0, 0.8); }
+      .header-info-mini { font-size: 0.65rem; color: #0dcaf0; text-transform: uppercase; font-weight: 800; }
+      .aviso-trava { font-size: 0.65rem; color: #ffc107; background: rgba(255, 193, 7, 0.1); padding: 8px; border-radius: 8px; border: 1px solid rgba(255, 193, 7, 0.2); display: none; }
+
+      /* Badge Proprietário */
+      .badge-proprietario {
+        background: linear-gradient(45deg, #0047ab, #00d4ff);
+        color: white;
+        font-size: 0.6rem;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-weight: 800;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+      }
+      .info-aviso-card { font-size: 0.55rem; color: #ffc107; font-weight: 600; text-transform: uppercase; margin-top: 4px; }
+
+      .spin { animation: spin 1s linear infinite; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+  </th:block>
+</head>
+
+<body>
+<div layout:fragment="conteudo">
+  <div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="fw-bold text-white mb-1"><i class="bi bi-people-fill me-2" style="color: #0dcaf0"></i> Gestão de Equipe</h2>
+        <p class="text-white-50 small mb-0">Shark Eletrônicos | Terminal de Liquidação Geral</p>
+      </div>
+      <div class="text-end">
+        <span class="badge bg-dark border border-secondary p-2 val-mono">
+          <i class="bi bi-calendar3 me-2 text-info"></i>
+          <span th:text="${#dates.format(#dates.createNow(), 'dd/MM/yyyy')}"></span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card-ganhos-stats border-left-info" style="background: linear-gradient(90deg, rgba(30, 41, 59, 0.9) 0%, rgba(2, 6, 23, 0.8) 100%); padding: 1.5rem;">
+        <div class="row align-items-center">
+          <div class="col-md-1 text-center d-none d-md-block">
+            <i class="bi bi-building-fill-check text-info" style="font-size: 2.5rem;"></i>
+          </div>
+          <div class="col-md-11">
+            <div class="row g-3 align-items-center">
+              <div class="col-md-4 border-end border-secondary border-opacity-25">
+                <span class="label-stats text-info">Unidade / Razão Social</span>
+                <div class="text-white fw-bold fs-5" th:text="${usuario.empresa.nome}">Nome da Empresa</div>
+                <span class="badge bg-dark border border-info text-info mt-1" style="font-size: 0.6rem; letter-spacing: 0.5px;">
+                  <i class="bi bi-shield-check me-1"></i> CONTA ATIVA
+                </span>
+              </div>
+              <div class="col-md-2 border-end border-secondary border-opacity-25">
+                <span class="label-stats">Documento (CNPJ)</span>
+                <div class="text-white-50 val-mono" th:text="${usuario.empresa.cnpj ?: '---'}"></div>
+              </div>
+              <div class="col-md-3 border-end border-secondary border-opacity-25">
+                <span class="label-stats">Plano Shark</span>
+                <div class="text-white-50 small">Premium Corporate</div>
+                <div th:class="${usuario.empresa.diasRestantes <= 3 ? 'text-danger fw-bold val-mono' : 'text-warning fw-bold val-mono'}" style="font-size: 0.7rem;">
+                  [[${usuario.empresa.diasRestantes}]] DIAS RESTANTES
+                </div>
+              </div>
+              <div class="col-md-3 d-flex flex-column gap-2">
+                <button class="btn btn-sm btn-warning fw-bold text-dark w-100" data-bs-toggle="modal" data-bs-target="#modalRenovar">
+                  <i class="bi bi-lightning-charge-fill me-1"></i> RENOVAR AGORA
+                </button>
+                <button class="btn btn-sm btn-outline-info fw-bold w-100" style="font-size: 0.7rem;" data-bs-toggle="modal" data-bs-target="#modalCnpj">
+                  <i class="bi bi-pencil-square me-1"></i> EDITAR CNPJ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-5">
+    <div class="col-md-4">
+      <div class="card-ganhos-stats border-left-info">
+        <span class="label-stats text-info"><i class="bi bi-graph-up-arrow me-1"></i> Faturamento Bruto Loja</span>
+        <span class="valor-bruto" th:text="${#numbers.formatCurrency(#aggregates.sum(usuarios.![brutoVendaCalculado + brutoOsCalculado]) ?: 0.0)}"></span>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card-ganhos-stats border-left-success">
+        <span class="label-stats text-success"><i class="bi bi-cash-stack me-1"></i> Comissões Pendentes</span>
+        <span class="valor-comissao text-success" th:text="${#numbers.formatCurrency(#aggregates.sum(usuarios.![saldoVendaCalculado + totalComissaoOsAcumulada]) ?: 0.0)}"></span>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card-ganhos-stats border-left-warning">
+        <span class="label-stats text-warning"><i class="bi bi-person-check me-1"></i> Colaboradores Ativos</span>
+        <span class="valor-bruto" th:text="${#lists.size(usuarios)}"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shark-card border-left-info shadow-lg mb-5" style="background: rgba(15, 23, 42, 0.6) !important;">
+    <div class="table-responsive">
+      <table class="table table-hover table-dark mb-0 align-middle text-center table-shark-admin">
+        <thead>
+        <tr>
+          <th class="ps-4 text-start">COLABORADOR</th>
+          <th>BRUTO ACUMULADO</th>
+          <th>TAXA (%)</th>
+          <th>LÍQUIDO (PENDENTE)</th>
+          <th style="width: 280px;">AÇÃO DIRETA</th>
+          <th class="pe-4 text-end">AJUSTES</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="u : ${usuarios}"
+            th:with="liqOs=${u.totalComissaoOsAcumulada ?: 0.0},
+                     liqVenda=${u.saldoVendaCalculado ?: 0.0}">
+
+          <td class="ps-4 text-start">
+            <div class="fw-bold text-white fs-6"><i class="bi bi-person-circle me-2 text-white-50"></i><span th:text="${u.nome}">Shark</span></div>
+            <div th:if="${u.aprovado}">
+              <span th:if="${u.tipoFuncionario == 'PROPRIETARIO'}" class="badge-proprietario"><i class="bi bi-star-fill me-1"></i>PROPRIETÁRIO</span>
+              <span th:unless="${u.tipoFuncionario == 'PROPRIETARIO'}" class="text-info-50 val-mono" style="font-size: 0.65rem;" th:text="${u.tipoFuncionario}">Cargo</span>
+            </div>
+            <span th:if="${!u.aprovado}" class="badge bg-warning text-dark fw-bold" style="font-size: 0.6rem;">AGUARDANDO APROVAÇÃO</span>
+          </td>
+
+          <td class="val-mono" style="font-size: 0.75rem;">
+            <div class="text-white-50"><i class="bi bi-tools me-1"></i>Serviços: [[${#numbers.formatCurrency(u.brutoOsCalculado ?: 0.0)}]]</div>
+            <div class="text-white-50"><i class="bi bi-cart-fill me-1"></i>Vendas: [[${#numbers.formatCurrency(u.brutoVendaCalculado ?: 0.0)}]]</div>
+          </td>
+
+          <td class="small">
+            <div class="text-info fw-bold"><i class="bi bi-tools me-1"></i>Serviços: [[${u.comissaoOs ?: 0}]]%</div>
+            <div class="text-info fw-bold"><i class="bi bi-cart-fill me-1"></i>Vendas: [[${u.comissaoVenda ?: 0}]]%</div>
+          </td>
+
+          <td class="val-mono">
+            <div th:class="${liqOs > 0.01 ? 'text-success' : 'text-white-50'}" style="font-size: 0.9rem;"><i class="bi bi-tools me-1"></i>Serviços: [[${#numbers.formatCurrency(liqOs)}]]</div>
+            <div th:class="${liqVenda > 0.01 ? 'text-info' : 'text-white-50'}" style="font-size: 0.9rem;"><i class="bi bi-cart-fill me-1"></i>Vendas: [[${#numbers.formatCurrency(liqVenda)}]]</div>
+          </td>
+
+          <td>
+            <form th:if="${!u.aprovado}" th:action="@{/admin/funcionarios/aprovar/{id}(id=${u.id})}" method="post">
+              <button type="submit" class="btn btn-sm btn-info fw-bold w-100 py-2"><i class="bi bi-person-check-fill me-2"></i>ACEITAR NOVO</button>
+            </form>
+
+            <div th:if="${u.aprovado}">
+              <div class="d-flex align-items-center gap-2 mb-1" th:if="${liqVenda > 0.01}">
+                <button type="button" class="btn btn-sm btn-pagar-venda fw-bold flex-grow-1 py-1"
+                        th:attr="onclick=|pagarDireto('${u.id}', '${liqVenda}', 'VENDA')|">
+                  <i class="bi bi-cart-check-fill me-1"></i> PAGAR VENDAS
+                </button>
+                <div th:if="${liqVenda > 0.01}" class="badge-data-pgto val-mono text-info">
+                  <th:block th:each="p : ${pagamentos}" th:if="${p.nomeFuncionario == u.nome && p.tipoComissao == 'VENDA'}">
+                    <span th:if="${pStat.first}" th:text="${#temporals.format(p.dataHora, 'dd/MM')}"></span>
+                  </th:block>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2 mb-1" th:if="${liqOs > 0.01}">
+                <button type="button" class="btn btn-sm btn-pagar-os fw-bold flex-grow-1 py-1"
+                        th:attr="onclick=|pagarDireto('${u.id}', '${liqOs}', 'OS')|">
+                  <i class="bi bi-tools me-1"></i> PAGAR SERVIÇOS
+                </button>
+                <div th:if="${liqOs > 0.01}" class="badge-data-pgto val-mono text-success">
+                  <th:block th:each="p : ${pagamentos}" th:if="${p.nomeFuncionario == u.nome && p.tipoComissao == 'OS'}">
+                    <span th:if="${pStat.first}" th:text="${#temporals.format(p.dataHora, 'dd/MM')}"></span>
+                  </th:block>
+                </div>
+              </div>
+
+              <div th:if="${liqVenda <= 0.01 and liqOs <= 0.01}" class="card-liquidado p-2" style="background: rgba(25, 135, 84, 0.1); border: 1px solid rgba(25, 135, 84, 0.3); height: auto;">
+                <div class="text-center border-bottom border-success border-opacity-25 mb-1 pb-1">
+                  <span style="font-size: 0.6rem; color: #198754;"><i class="bi bi-check-all me-1"></i>SALDO ZERADO</span>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-1 px-1">
+                  <span style="font-size: 0.5rem; color: #0dcaf0; font-weight: 800;">VENDAS:</span>
+                  <span class="val-mono text-white-50" style="font-size: 0.58rem;">
+                    <th:block th:each="p : ${pagamentos}" th:if="${p.nomeFuncionario == u.nome && p.tipoComissao == 'VENDA'}">
+                      <span th:if="${pStat.first}" th:text="${#temporals.format(p.dataHora, 'dd/MM/yyyy HH:mm')}"></span>
+                    </th:block>
+                  </span>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center px-1">
+                  <span style="font-size: 0.5rem; color: #00c853; font-weight: 800;">SERVIÇOS:</span>
+                  <span class="val-mono text-white-50" style="font-size: 0.58rem;">
+                    <th:block th:each="p : ${pagamentos}" th:if="${p.nomeFuncionario == u.nome && p.tipoComissao == 'OS'}">
+                      <span th:if="${pStat.first}" th:text="${#temporals.format(p.dataHora, 'dd/MM/yyyy HH:mm')}"></span>
+                    </th:block>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </td>
+
+          <td class="pe-4 text-end">
+            <div class="btn-group gap-1">
+              <button class="btn btn-sm btn-outline-info"
+                      type="button"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalComissao"
+                      th:attr="data-id=${u.id}, data-nome=${u.nome}, data-tipo=${u.tipoFuncionario}, data-com-os=${u.comissaoOs}, data-com-venda=${u.comissaoVenda}, data-liq-os=${liqOs}, data-liq-venda=${liqVenda}"
+                      onclick="popularDados(this)">
+                <i class="bi bi-gear-fill"></i>
+              </button>
+              <form th:action="@{/admin/funcionarios/deletar/{id}(id=${u.id})}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Excluir funcionário permanentemente?')">
+                  <i class="bi bi-person-x-fill"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card shark-card border-left-success" style="background: rgba(0,0,0,0.4) !important;">
+    <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+      <h5 class="fw-bold text-white mb-0 small text-uppercase"><i class="bi bi-clock-history me-2 text-success"></i> Histórico de Movimentações Recentes</h5>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dark table-shark-admin table-sm mb-0 align-middle text-center">
+        <thead class="bg-black">
+        <tr>
+          <th class="ps-4 py-2">Data</th>
+          <th>Pagador</th>
+          <th>Recebedor</th>
+          <th>Tipo</th>
+          <th class="pe-4 text-end">Valor</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="p : ${pagamentos}">
+          <td class="ps-4 py-3 text-white-50 val-mono x-small" th:text="${#temporals.format(p.dataHora, 'dd/MM HH:mm')}"></td>
+          <td class="fw-bold text-info" th:text="${p.responsavelPagamento}"></td>
+          <td class="text-white" th:text="${p.nomeFuncionario}"></td>
+          <td><span th:class="${p.tipoComissao == 'VENDA' ? 'badge bg-info text-dark px-2 fw-bold' : 'badge bg-success text-white px-2 fw-bold'}" th:text="${p.tipoComissao}" style="font-size: 0.6rem;"></span></td>
+          <td class="pe-4 text-end text-success fw-bold val-mono fs-6" th:text="${#numbers.formatCurrency(p.valorPago)}"></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalRenovar" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-shark-content" style="border-left: 5px solid #009ee3 !important;">
+        <div class="modal-header border-secondary">
+          <h5 class="text-white fw-bold modal-title">
+            <img src="https://http2.mlstatic.com/frontend-assets/ml-extras/mp-logo.venezuela.svg" width="30" class="me-2">
+            Renovação Mercado Pago
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <div id="mp-selection-area">
+            <p class="text-white-50 small mb-4">Escolha o período de renovação:</p>
+            <div class="d-grid gap-2 mb-4">
+              <button class="btn btn-lg btn-primary fw-bold mb-2" onclick="gerarPagamentoMP(30)">
+                RENOVAR 30 DIAS - R$ 60,00
+              </button>
+              <button class="btn btn-sm btn-outline-info" onclick="gerarPagamentoMP(365)">
+                PLANO ANUAL (DESCONTO)
+              </button>
+            </div>
+          </div>
+
+          <div id="mp-qr-container" style="display: none;">
+            <div class="bg-white p-3 d-inline-block rounded mb-3 shadow-lg">
+              <img id="qrCodeImage" src="" alt="QR Code PIX" style="width: 200px;">
+            </div>
+            <div class="alert bg-black border-secondary text-start">
+              <small class="header-info-mini d-block mb-1 text-info">Código PIX Copia e Cola</small>
+              <input type="text" id="pixCopiaCola" class="form-control form-control-sm bg-transparent text-white-50 border-0 p-0 val-mono" readonly onclick="this.select();">
+            </div>
+            <div class="info-aviso-card mt-2">
+              <i class="bi bi-arrow-repeat spin me-1"></i> Aguardando confirmação do pagamento...
+            </div>
+          </div>
+
+          <div class="info-aviso-card mt-3">
+            <i class="bi bi-shield-lock-fill me-1"></i> Processado com segurança pelo Mercado Pago.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modalCnpj" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-shark-content">
+        <form th:action="@{/admin/empresa/atualizar-cnpj}" method="post">
+          <div class="modal-header border-secondary">
+            <h5 class="text-white fw-bold modal-title"><i class="bi bi-card-checklist me-2 text-info"></i>Atualizar CNPJ</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-4 text-start">
+            <div class="mb-3">
+              <label class="header-info-mini mb-2">Novo CNPJ da Empresa</label>
+              <input type="text" name="cnpj" id="cnpjInputEmp" class="form-control bg-black text-white border-secondary shadow-none val-mono"
+                     th:value="${usuario.empresa.cnpj}" placeholder="00.000.000/0000-00">
+            </div>
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-info fw-bold py-2 text-dark">SALVAR DOCUMENTO</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">CANCELAR</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <form id="formPagamentoDireto" th:action="@{/pagamentos/registrar}" method="post" style="display: none;">
+    <input type="hidden" name="funcionarioId" id="inputFuncId">
+    <input type="hidden" name="valorPago" id="inputValor">
+    <input type="hidden" name="tipoComissao" id="inputTipo">
+  </form>
+
+  <div class="modal fade" id="modalComissao" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-shark-content">
+        <div class="modal-header border-secondary">
+          <h5 class="text-white fw-bold modal-title"><i class="bi bi-sliders me-2 text-info"></i>Configurar Taxas</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4 text-start">
+          <div id="avisoTrava" class="aviso-trava mb-3">
+            <i class="bi bi-lock-fill me-1"></i> Taxas bloqueadas. Liquide os saldos pendentes antes de alterar as porcentagens.
+          </div>
+          <input type="hidden" id="idFuncModal">
+          <div class="mb-3">
+            <label class="header-info-mini mb-2">Função do Colaborador</label>
+            <select id="tipoFuncModal" class="form-select bg-black text-white border-secondary shadow-none">
+              <option value="VENDEDOR">VENDEDOR</option>
+              <option value="TECNICO">TÉCNICO</option>
+              <option value="PROPRIETARIO">PROPRIETÁRIO</option>
+            </select>
+          </div>
+          <div class="row g-2 mb-4">
+            <div class="col-6">
+              <label class="header-info-mini mb-2 text-info">Taxa OS (%)</label>
+              <input type="number" id="osFuncModal" class="form-control bg-black text-white border-secondary shadow-none">
+            </div>
+            <div class="col-6">
+              <label class="header-info-mini mb-2 text-info">Taxa Vendas (%)</label>
+              <input type="number" id="vendaFuncModal" class="form-control bg-black text-white border-secondary shadow-none">
+            </div>
+          </div>
+          <div class="d-grid gap-2">
+            <button type="button" id="btnSalvarModal" onclick="salvarConfig(event)" class="btn btn-info fw-bold py-2 text-dark">SALVAR ALTERAÇÕES</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">FECHAR</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<th:block layout:fragment="scripts">
+  <script th:inline="javascript">
+    let intervaloCheck;
+
+    function gerarPagamentoMP(dias) {
+      const selectionArea = document.getElementById('mp-selection-area');
+      const container = document.getElementById('mp-qr-container');
+      const header = document.querySelector('meta[name="_csrf_header"]').content;
+      const token = document.querySelector('meta[name="_csrf"]').content;
+
+      fetch(`/admin/empresa/gerar-renovacao?dias=${dias}`, {
+        method: 'POST',
+        headers: { [header]: token }
+      })
+              .then(res => res.json())
+              .then(data => {
+                const diasAntigos = (data.dias_anteriores !== undefined && data.dias_anteriores !== null)
+                        ? data.dias_anteriores
+                        : 0;
+
+                document.getElementById('qrCodeImage').src = `data:image/jpeg;base64,${data.qr_code_base64}`;
+                document.getElementById('pixCopiaCola').value = data.qr_code;
+                selectionArea.style.display = 'none';
+                container.style.display = 'block';
+                iniciarVerificacao(diasAntigos);
+              })
+              .catch(err => {
+                console.error("Erro ao gerar PIX:", err);
+                alert("Erro ao conectar com Mercado Pago.");
+              });
+    }
+
+    function iniciarVerificacao(diasAntigos) {
+      if (intervaloCheck) clearInterval(intervaloCheck);
+      intervaloCheck = setInterval(() => {
+        fetch(`/pagamentos/assinatura/status-check?diasAnteriores=${diasAntigos}`)
+                .then(res => res.json())
+                .then(pago => {
+                  if (pago) {
+                    clearInterval(intervaloCheck);
+                    alert("🦈 SHARK ATUALIZADA! Pagamento confirmado.");
+                    window.location.reload();
+                  }
+                });
+      }, 5000);
+    }
+
+    const cnpjInputEmp = document.getElementById('cnpjInputEmp');
+    if(cnpjInputEmp) {
+      cnpjInputEmp.addEventListener('input', e => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 2) v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+        if (v.length > 5) v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+        if (v.length > 8) v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+        if (v.length > 12) v = v.replace(/(\d{4})(\d)/, '$1-$2');
+        if (v.length > 18) v = v.substring(0, 18);
+        e.target.value = v;
+      });
+    }
+
+    function popularDados(btn) {
+      const liqOs = parseFloat(btn.getAttribute('data-liq-os') || 0);
+      const liqVenda = parseFloat(btn.getAttribute('data-liq-venda') || 0);
+      const inputOs = document.getElementById('osFuncModal');
+      const inputVenda = document.getElementById('vendaFuncModal');
+      const btnSalvar = document.getElementById('btnSalvarModal');
+      const aviso = document.getElementById('avisoTrava');
+
+      document.getElementById('idFuncModal').value = btn.getAttribute('data-id');
+      document.getElementById('tipoFuncModal').value = btn.getAttribute('data-tipo') || 'VENDEDOR';
+      inputOs.value = btn.getAttribute('data-com-os') || 0;
+      inputVenda.value = btn.getAttribute('data-com-venda') || 0;
+
+      if (liqOs > 0.01 || liqVenda > 0.01) {
+        inputOs.disabled = true;
+        inputVenda.disabled = true;
+        btnSalvar.disabled = true;
+        aviso.style.display = 'block';
+      } else {
+        inputOs.disabled = false;
+        inputVenda.disabled = false;
+        btnSalvar.disabled = false;
+        aviso.style.display = 'none';
+      }
+    }
+
+    function salvarConfig(e) {
+      e.preventDefault();
+      const id = document.getElementById('idFuncModal').value;
+      const payload = new URLSearchParams();
+      payload.append('tipoFuncionario', document.getElementById('tipoFuncModal').value);
+      payload.append('comissaoOs', document.getElementById('osFuncModal').value);
+      payload.append('comissaoVenda', document.getElementById('vendaFuncModal').value);
+
+      const token = document.querySelector('meta[name="_csrf"]')?.content;
+      const header = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+      fetch(`/admin/funcionarios/configurar/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', [header]: token },
+        body: payload.toString()
+      }).then(res => { if(res.ok) window.location.reload(); });
+    }
+
+    function pagarDireto(funcId, valor, tipo) {
+      const rotulo = tipo === 'VENDA' ? 'VENDAS' : 'SERVIÇOS';
+      if(confirm("Confirmar pagamento de " + rotulo + " no valor de R$ " + parseFloat(valor).toFixed(2) + "?")) {
+        document.getElementById('inputFuncId').value = funcId;
+        document.getElementById('inputValor').value = valor;
+        document.getElementById('inputTipo').value = tipo;
+        document.getElementById('formPagamentoDireto').submit();
+      }
+    }
+  </script>
+</th:block>
+</body>
+</html>

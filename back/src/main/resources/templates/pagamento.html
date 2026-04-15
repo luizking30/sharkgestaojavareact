@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Pagamento - Shark Eletrônicos</title>
+    <style>
+        .input-dias {
+            background: #000 !important;
+            color: #ffc107 !important;
+            border: 2px solid #334155 !important;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 15px;
+        }
+        .input-dias:focus {
+            border-color: #ffc107 !important;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div layout:fragment="conteudo">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card bg-dark border-warning shadow-lg" style="border-radius: 20px; border-width: 2px;">
+                <div class="card-body p-5 text-center">
+
+                    <div class="mb-4">
+                        <i class="bi bi-clock-history text-warning" style="font-size: 4rem;"></i>
+                    </div>
+
+                    <h2 class="fw-bold text-white mb-2">RECARGA DE ACESSO</h2>
+                    <p class="text-white-50 mb-4">Escolha quantos dias deseja adicionar ao seu sistema.</p>
+
+                    <form th:action="@{/pagamento/gerar-pix}" method="post">
+
+                        <div class="mb-4">
+                            <label for="quantidadeDias" class="text-muted small fw-bold mb-2 d-block">QUANTIDADE DE DIAS (R$ 2,00/dia)</label>
+                            <input type="number" name="quantidadeDias" id="quantidadeDias"
+                                   class="form-control input-dias mx-auto"
+                                   style="max-width: 150px;"
+                                   value="30" min="5" step="1"
+                                   oninput="atualizarResumo()">
+                            <small class="text-info mt-2 d-block">* Mínimo de 5 dias para recarga.</small>
+                        </div>
+
+                        <hr class="border-secondary my-4">
+
+                        <div class="d-flex justify-content-between align-items-center mb-4 bg-black p-3 rounded-3 border border-secondary">
+                            <div class="text-start">
+                                <span class="d-block text-muted small">Total a pagar:</span>
+                                <span class="fw-bold text-white" id="labelDias">30 Dias de Acesso</span>
+                            </div>
+                            <div class="text-end">
+                                <span class="h3 fw-bold text-success" id="valorTotal">R$ 60,00</span>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold py-3 mb-3">
+                            <i class="bi bi-qr-code me-2"></i> GERAR PIX PARA PAGAR
+                        </button>
+                    </form>
+
+                    <p class="small text-muted mb-0">
+                        <i class="bi bi-shield-check text-success"></i> Liberação instantânea após o pagamento.
+                    </p>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a th:href="@{/dashboard}" class="text-white-50 text-decoration-none small">
+                    <i class="bi bi-arrow-left"></i> Voltar ao Painel Principal
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script>
+        function atualizarResumo() {
+            const input = document.getElementById('quantidadeDias');
+            const labelDias = document.getElementById('labelDias');
+            const valorTotal = document.getElementById('valorTotal');
+
+            let dias = parseInt(input.value);
+
+            if (isNaN(dias) || dias < 5) dias = 5;
+
+            const precoDia = 2.00;
+            const total = dias * precoDia;
+
+            labelDias.innerText = dias + " Dias de Acesso";
+            valorTotal.innerText = "R$ " + total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            atualizarResumo();
+        });
+    </script>
+</th:block>
+
+</body>
+</html>
