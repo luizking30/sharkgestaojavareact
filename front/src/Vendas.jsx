@@ -1,9 +1,16 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import api from './api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { debounce } from './utils/debounce';
+import { unwrapPage } from './utils/pageResponse';
+import SharkPagination from './components/SharkPagination';
+import { useFeedback } from './context/FeedbackContext';
+
+const HIST_PAGE_SIZE = 15;
 
 const Vendas = ({ usuarioLogado }) => {
     const queryClient = useQueryClient();
+    const { notify } = useFeedback();
 
     // --- 1. ESTADOS DO PDV ---
     const [itensCarrinho, setItensCarrinho] = useState([]);
@@ -16,6 +23,7 @@ const Vendas = ({ usuarioLogado }) => {
     const [desconto, setDesconto] = useState(0);
     const [quantidade, setQuantidade] = useState(1);
     const [filtros, setFiltros] = useState({ id: '', vendedor: '', data: '' });
+    const [histPage, setHistPage] = useState(0);
 
     const isAdmin = usuarioLogado?.role === 'ROLE_ADMIN';
     const inputBuscaRef = useRef(null);
@@ -25,21 +33,91 @@ const Vendas = ({ usuarioLogado }) => {
         return itensCarrinho.reduce((acc, it) => acc + it.subtotal, 0);
     }, [itensCarrinho]);
 
-    // --- 3. CARREGAMENTO DO HISTÓRICO VIA REACT QUERY ---
-    const { data: vendasHistorico = [] } = useQuery({
-        queryKey: ['historico-vendas'],
+    useEffect(() => {
+        setHistPage(0);
+    }, [filtros.id, filtros.vendedor, filtros.data]);
+
+    const { data: histPageData, isLoading: histLoading } = useQuery({
+        queryKey: ['historico-vendas', histPage, filtros.id, filtros.vendedor, filtros.data],
         queryFn: async () => {
-            const res = await api.get('/api/vendas');
-            return res.data;
-        }
+            const params = {
+                page: histPage,
+                size: HIST_PAGE_SIZE,
+                sort: 'dataHora,desc',
+            };
+            if (filtros.id && /^\d+$/.test(filtros.id.trim())) {
+                params.id = Number(filtros.id.trim());
+            }
+            if (filtros.vendedor?.trim()) {
+                params.vendedor = filtros.vendedor.trim();
+            }
+            if (filtros.data) {
+                params.data = filtros.data;
+            }
+            const res = await api.get('/api/vendas', { params });
+            return unwrapPage(res.data);
+        },
     });
 
-    // --- 4. EFEITOS INICIAIS (RELÓGIO E ATALHOS) ---
+    const vendasHistorico = histPageData?.items ?? [];
+    const histTotalElements = histPageData?.totalElements ?? 0;
+    const histTotalPages = histPageData?.totalPages ?? 1;
+
+    const debouncedFetchProdutos = useMemo(
+        () =>
+            debounce(async (valor) => {
+                if (valor.length < 1) {
+                    setSugestoes([]);
+                    return;
+                }
+                try {
+                    const res = await api.get(`/api/estoque/sugestoes?termo=${encodeURIComponent(valor)}`);
+                    setSugestoes(res.data);
+                    setExibirSugestoes(true);
+                } catch (err) {
+                    console.error(err);
+                }
+            }, 280),
+        []
+    );
+
     useEffect(() => {
         const timer = setInterval(() => {
             setRelogio(new Date().toLocaleTimeString('pt-BR'));
         }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
+    const finalizarVenda = useCallback(async () => {
+        if (itensCarrinho.length === 0) {
+            notify.warning('Adicione itens ao carrinho antes de finalizar.', 'Carrinho vazio');
+            return;
+        }
+
+        const vendaDTO = {
+            valorTotal: totalGeral,
+            itens: itensCarrinho.map(it => ({
+                produto: { id: it.produtoId },
+                quantidade: it.qtd,
+                precoUnitario: it.precoFinal,
+                desconto: it.desconto
+            }))
+        };
+
+        try {
+            await api.post('/api/vendas/salvar', vendaDTO);
+            notify.success('Venda finalizada com sucesso.', 'PDV');
+
+            queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['historico-vendas'] });
+
+            setItensCarrinho([]);
+        } catch (err) {
+            notify.error('Não foi possível salvar a venda.', 'PDV');
+        }
+    }, [itensCarrinho, totalGeral, queryClient, notify]);
+
+    useEffect(() => {
         const handleF2 = (e) => {
             if (e.key === "F2") {
                 e.preventDefault();
@@ -47,25 +125,17 @@ const Vendas = ({ usuarioLogado }) => {
             }
         };
         window.addEventListener('keydown', handleF2);
-
-        return () => {
-            clearInterval(timer);
-            window.removeEventListener('keydown', handleF2);
-        };
-    }, [itensCarrinho, totalGeral]);
+        return () => window.removeEventListener('keydown', handleF2);
+    }, [finalizarVenda]);
 
     // --- LOGICA DE BUSCA ---
-    const buscarProdutos = async (valor) => {
+    const buscarProdutos = (valor) => {
         setTermoBusca(valor);
         if (valor.length < 1) {
             setSugestoes([]);
             return;
         }
-        try {
-            const res = await api.get(`/api/estoque/sugestoes?termo=${valor}`);
-            setSugestoes(res.data);
-            setExibirSugestoes(true);
-        } catch (err) { console.error(err); }
+        debouncedFetchProdutos(valor);
     };
 
     const selecionarProduto = (p) => {
@@ -77,22 +147,27 @@ const Vendas = ({ usuarioLogado }) => {
 
     // --- LOGICA DO CARRINHO ---
     const adicionarAoCarrinho = () => {
-        if (!produtoSelecionado) return alert("Selecione um produto!");
-        if (quantidade > produtoSelecionado.quantidade) {
-            alert(`Estoque insuficiente! Disponível: ${produtoSelecionado.quantidade}`);
+        if (!produtoSelecionado) {
+            notify.warning('Selecione um produto na busca antes de incluir.', 'PDV');
             return;
         }
-        if (desconto > 10) {
-            alert("Desconto máximo permitido: 10%");
+        if (quantidade > produtoSelecionado.quantidade) {
+            notify.warning(`Estoque insuficiente. Disponível: ${produtoSelecionado.quantidade}.`, 'Estoque');
+            return;
+        }
+        const descontoNum = Number(desconto) || 0;
+        if (descontoNum > 10) {
+            notify.warning('Desconto máximo permitido: 10%.', 'PDV');
             return;
         }
 
-        const precoFinal = precoUn - (precoUn * (desconto / 100));
+        const precoNum = Number(precoUn) || 0;
+        const precoFinal = precoNum - (precoNum * (descontoNum / 100));
 
         const itemExistente = itensCarrinho.find(it => it.produtoId === produtoSelecionado.id);
         if (itemExistente) {
             if (itemExistente.qtd + quantidade > produtoSelecionado.quantidade) {
-                alert("Soma excede o estoque disponível!");
+                notify.warning('A quantidade total no carrinho excede o estoque disponível.', 'Estoque');
                 return;
             }
             setItensCarrinho(itensCarrinho.map(it =>
@@ -104,10 +179,10 @@ const Vendas = ({ usuarioLogado }) => {
             setItensCarrinho([...itensCarrinho, {
                 produtoId: produtoSelecionado.id,
                 nome: produtoSelecionado.nome,
-                precoOriginal: precoUn,
+                precoOriginal: precoNum,
                 precoFinal: precoFinal,
-                desconto: desconto,
-                qtd: quantity || quantidade,
+                desconto: descontoNum,
+                qtd: quantidade,
                 subtotal: precoFinal * quantidade
             }]);
         }
@@ -124,56 +199,8 @@ const Vendas = ({ usuarioLogado }) => {
         setItensCarrinho(itensCarrinho.filter((_, i) => i !== index));
     };
 
-    const finalizarVenda = async () => {
-        if (itensCarrinho.length === 0) return alert("Carrinho vazio!");
-
-        const vendaDTO = {
-            valorTotal: totalGeral,
-            itens: itensCarrinho.map(it => ({
-                produto: { id: it.produtoId },
-                quantidade: it.qtd,
-                precoUnitario: it.precoFinal,
-                desconto: it.desconto
-            }))
-        };
-
-        try {
-            await api.post('/api/vendas/salvar', vendaDTO);
-            alert("Venda Finalizada com Sucesso!");
-
-            queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] });
-            queryClient.invalidateQueries({ queryKey: ['historico-vendas'] });
-
-            setItensCarrinho([]);
-        } catch (err) { alert("Erro ao salvar venda."); }
-    };
-
-    // --- FILTRAGEM DO HISTORICO ---
-    const historicoFiltrado = useMemo(() => {
-        return vendasHistorico.filter(v => {
-            const matchId = filtros.id === '' || v.id.toString().includes(filtros.id);
-            const matchVend = v.vendedor?.nome.toLowerCase().includes(filtros.vendedor.toLowerCase());
-            const matchData = filtros.data === '' || v.dataHora.startsWith(filtros.data);
-            return matchId && matchVend && matchData;
-        });
-    }, [vendasHistorico, filtros]);
-
     return (
         <div className="mt-2 text-white">
-            <style>
-                {`
-                .shark-card { background: #1a1a1a; border-radius: 15px; border-left: 5px solid #333; transition: 0.3s; }
-                .border-left-info { border-left-color: #0dcaf0 !important; }
-                .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
-                .sugestoes-wrapper { background: #121212; border: 2px solid #0dcaf0; position: absolute; width: 100%; z-index: 2000; border-radius: 0 0 10px 10px; max-height: 300px; overflow-y: auto; }
-                .suggestion-item { padding: 12px; border-bottom: 1px solid #222; cursor: pointer; }
-                .suggestion-item:hover { background: #1a1a1a; border-left: 3px solid #0dcaf0; }
-                #totalVenda { text-shadow: 0 0 15px rgba(6, 249, 6, 0.6); font-family: 'Courier New', monospace; color: #06f906; font-size: 3.5rem; }
-                .input-busca-venda { background: #000 !important; border: 1px solid #333 !important; color: #fff !important; }
-                input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
-                .historico-item-linha { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0; }
-                `}
-            </style>
 
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
@@ -187,7 +214,7 @@ const Vendas = ({ usuarioLogado }) => {
                 </span>
             </div>
 
-            <div className="card shark-card border-left-info mb-5">
+            <div className="card shark-page-card border-left-info mb-5">
                 <div className="card-body p-4">
                     <div className="row g-3 align-items-end mb-4 border-bottom border-secondary pb-4">
                         <div className="col-md-4 position-relative">
@@ -196,9 +223,9 @@ const Vendas = ({ usuarioLogado }) => {
                                    value={termoBusca} onChange={(e) => buscarProdutos(e.target.value)}
                                    placeholder="Nome ou código..." onBlur={() => setTimeout(() => setExibirSugestoes(false), 200)} />
                             {exibirSugestoes && sugestoes.length > 0 && (
-                                <div className="sugestoes-wrapper">
+                                <div className="shark-sugestoes-wrapper">
                                     {sugestoes.map(p => (
-                                        <div key={p.id} className="suggestion-item" onClick={() => selecionarProduto(p)}>
+                                        <div key={p.id} className="shark-suggestion-item" onClick={() => selecionarProduto(p)}>
                                             <div className="fw-bold text-info">{p.nome}</div>
                                             <div className="d-flex justify-content-between small">
                                                 <span>Estoque: {p.quantidade}</span>
@@ -222,7 +249,7 @@ const Vendas = ({ usuarioLogado }) => {
                             <input type="number" className="form-control bg-black text-white p-3" value={quantidade} onChange={e => setQuantidade(parseInt(e.target.value) || 1)} />
                         </div>
                         <div className="col-md-2">
-                            <button className="btn btn-info w-100 p-3 fw-bold" onClick={adicionarAoCarrinho}>INCLUIR</button>
+                            <button type="button" className="btn btn-shark-primary w-100 p-3" onClick={adicionarAoCarrinho}>INCLUIR</button>
                         </div>
                     </div>
 
@@ -262,11 +289,11 @@ const Vendas = ({ usuarioLogado }) => {
                     <div className="d-flex justify-content-between align-items-center mt-4">
                         <div>
                             <span className="text-white-50 small text-uppercase">Total da Venda</span>
-                            <h1 id="totalVenda" className="fw-bold">R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h1>
+                            <h1 className="pdv-total-display fw-bold">R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h1>
                         </div>
                         <div className="d-flex gap-3">
-                            <button className="btn btn-outline-secondary btn-lg px-4" onClick={() => setItensCarrinho([])}>LIMPAR</button>
-                            <button className="btn btn-success btn-lg px-5 fw-bold" onClick={finalizarVenda}>FINALIZAR (F2)</button>
+                            <button type="button" className="btn btn-shark-secondary btn-lg px-4" onClick={() => setItensCarrinho([])}>LIMPAR</button>
+                            <button type="button" className="btn btn-success btn-lg px-5 fw-bold" onClick={finalizarVenda}>FINALIZAR (F2)</button>
                         </div>
                     </div>
                 </div>
@@ -298,7 +325,10 @@ const Vendas = ({ usuarioLogado }) => {
                         </tr>
                         </thead>
                         <tbody>
-                        {historicoFiltrado.map(v => (
+                        {histLoading ? (
+                            <tr><td colSpan={5} className="text-center py-4 text-info">Carregando…</td></tr>
+                        ) : (
+                        vendasHistorico.map(v => (
                             <tr key={v.id} className="align-middle">
                                 <td className="ps-4">
                                     <div className="fw-bold">{new Date(v.dataHora).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</div>
@@ -318,11 +348,21 @@ const Vendas = ({ usuarioLogado }) => {
                                     {isAdmin && <button className="btn btn-sm btn-outline-danger border-0"><i className="bi bi-arrow-counterclockwise"></i></button>}
                                 </td>
                             </tr>
-                        ))}
+                        ))
+                        )}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            <SharkPagination
+                page={histPage}
+                totalPages={histTotalPages}
+                totalElements={histTotalElements}
+                pageSize={HIST_PAGE_SIZE}
+                onPageChange={setHistPage}
+                disabled={histLoading}
+            />
         </div>
     );
 };

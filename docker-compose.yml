@@ -1,0 +1,141 @@
+services:
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:4444
+    container_name: shark-front
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: shark-api
+    ports:
+      - "4444:8080"
+    env_file:
+      - ./back/.env
+    environment:
+      - TZ=America/Sao_Paulo
+      - DB_URL=jdbc:mysql://shark-db:3306/shark?createDatabaseIfNotExist=true
+      - DB_USER=root
+      - DB_PASSWORD=123456
+      - EVOLUTION_BASE_URL=http://evolution-api:8080
+    depends_on:
+      evolution-api:
+        condition: service_started
+      shark-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  shark-db:
+    image: mysql:8.0
+    container_name: shark-db
+    ports:
+      - "3308:3306"
+    command: --default-authentication-plugin=mysql_native_password --skip-name-resolve
+    environment:
+      - TZ=America/Sao_Paulo
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=shark
+      - MYSQL_INITDB_SKIP_TZINFO=1
+    volumes:
+      - shark_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p123456 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  evolution-api:
+    image: atendai/evolution-api:v2.1.2
+    container_name: evolution-api
+    command: >
+      /bin/bash -c "sed -i 's/path:\\[\"id\"\\]/path:\"$.id\"/g; s/path:\\[\"fromMe\"\\]/path:\"$.fromMe\"/g; s/path:\\[\"remoteJid\"\\]/path:\"$.remoteJid\"/g; s/path:\\[\"participants\"\\]/path:\"$.participants\"/g' /evolution/dist/main.js &&
+      . ./Docker/scripts/deploy_database.sh &&
+      npm run start:prod"
+    ports:
+      - "8090:8080"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      - TZ=America/Sao_Paulo
+      - AUTHENTICATION_API_KEY=shark_secret_key
+      # URL pública do Manager/QR. No celular na mesma rede, prefira http://SEU_IP_LAN:8090
+      # (defina SERVER_URL num arquivo .env na pasta deste compose, ou exporte antes do up).
+      - SERVER_URL=${SERVER_URL:-http://localhost:8090}
+      # Ajuda QR/pairing via REST em algumas builds v2.1.x (ver EvolutionAPI/evolution-api#2385)
+      - QRCODE_LIMIT=30
+      - QRCODE_COLOR=#198754
+      - CONFIG_SESSION_PHONE_CLIENT=Safari
+      - "CONFIG_SESSION_PHONE_NAME=Mac OS"
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1030831524
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=mysql
+      - DATABASE_CONNECTION_URI=mysql://root:123456@evolution-db:3306/evolution
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://evolution-redis:6379/0
+      - LOG_LEVEL=ERROR
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      evolution-db:
+        condition: service_healthy
+      evolution-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  evolution-db:
+    image: mysql:8.0
+    container_name: evolution-db
+    # Host 3307 evita conflito com MySQL local do Windows na 3306.
+    # Dentro da rede Docker a Evolution continua em evolution-db:3306.
+    ports:
+      - "3307:3306"
+    command: --default-authentication-plugin=mysql_native_password --skip-name-resolve
+    environment:
+      - TZ=America/Sao_Paulo
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=evolution
+      - MYSQL_INITDB_SKIP_TZINFO=1
+    volumes:
+      - evolution_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p123456 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: evolution-redis
+    environment:
+      - TZ=America/Sao_Paulo
+    command: redis-server --appendonly yes
+    volumes:
+      - evolution_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  shark_mysql_data:
+  evolution_instances:
+  evolution_mysql_data:
+  evolution_redis_data:

@@ -7,6 +7,7 @@ import com.assistencia.dto.LoginDTO;
 import com.assistencia.repository.UsuarioRepository;
 import com.assistencia.repository.EmpresaRepository;
 import com.assistencia.service.EmailService;
+import com.assistencia.service.WhatsappService;
 import com.assistencia.util.CpfValidator;
 import com.assistencia.security.JwtService;
 import jakarta.validation.Valid;
@@ -17,17 +18,21 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class AuthController {
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private EmpresaRepository empresaRepository;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private EmailService emailService;
+    @Autowired private WhatsappService whatsappService;
     @Autowired private JwtService jwtService;
     @Autowired private AuthenticationManager authenticationManager;
 
@@ -54,6 +59,7 @@ public class AuthController {
         // 4. Resposta Definitiva
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
+        response.put("id", user.getId());
         response.put("username", user.getUsername());
         response.put("role", user.getRole());
         response.put("nome", user.getNome());
@@ -62,6 +68,8 @@ public class AuthController {
         Map<String, Object> empresaMap = new HashMap<>();
         empresaMap.put("id", user.getEmpresa().getId());
         empresaMap.put("nome", user.getEmpresa().getNome());
+        empresaMap.put("cnpj", user.getEmpresa().getCnpj());
+        empresaMap.put("whatsapp", user.getEmpresa().getWhatsapp());
         empresaMap.put("diasRestantes", user.getEmpresa().getDiasRestantes());
         empresaMap.put("ativo", user.getEmpresa().isAtivo());
 
@@ -104,6 +112,9 @@ public class AuthController {
             usuario.setAprovado(false);
             usuario.setEmpresa(emp);
 
+            // 🛡️ Segurança: Funcionários novos nunca são root
+            usuario.setRoot(false);
+
             Usuario salvo = usuarioRepository.save(usuario);
 
             // 📧 DISPARO DE BOAS-VINDAS PARA FUNCIONÁRIO (Layout Padronizado)
@@ -113,6 +124,12 @@ public class AuthController {
                     salvo.getUsername(),
                     salvo.getCpf(),
                     salvo.getWhatsapp()
+            );
+            whatsappService.enviarBoasVindasFuncionario(
+                    salvo.getWhatsapp(),
+                    emp.getNome(),
+                    salvo.getUsername(),
+                    salvo.getCpf()
             );
 
             return ResponseEntity.ok(salvo);
@@ -124,7 +141,9 @@ public class AuthController {
     @PostMapping("/registro-empresa")
     public ResponseEntity<?> registrarEmpresa(@RequestBody @Valid Usuario usuario,
                                               @RequestParam String nomeEmpresa,
-                                              @RequestParam(required = false) String cnpj) {
+                                              @RequestParam(required = false) String cnpj,
+                                              @RequestParam(required = false) String whatsappEmpresa) {
+        log.info("Registro de empresa solicitado: nomeEmpresa='{}', email='{}'", nomeEmpresa, usuario.getEmail());
 
         Map<String, String> erros = validarDados(usuario);
 
@@ -134,23 +153,27 @@ public class AuthController {
 
         String cnpjLimpo = (cnpj != null && !cnpj.isBlank()) ? cnpj.replaceAll("\\D", "") : null;
         if (cnpjLimpo != null && !cnpjLimpo.isEmpty()) {
+            if (cnpjLimpo.length() != 14) {
+                erros.put("cnpj", "CNPJ incompleto. Informe os 14 dígitos.");
+            }
             if (empresaRepository.findByCnpj(cnpjLimpo).isPresent()) {
                 erros.put("cnpj", "Este CNPJ já está cadastrado.");
             }
+        }
+        String whatsappEmpresaLimpo = (whatsappEmpresa != null && !whatsappEmpresa.isBlank()) ? whatsappEmpresa.replaceAll("\\D", "") : "";
+        if (whatsappEmpresaLimpo.length() < 11) {
+            erros.put("whatsappEmpresa", "WhatsApp da empresa incompleto. Informe 11 dígitos.");
         }
 
         if (usuarioRepository.findByUsername(usuario.getUsername()).isPresent()) {
             erros.put("username", "Este login já está sendo usado.");
         }
-
         if (usuarioRepository.findByEmail(usuario.getEmail()).isPresent()) {
             erros.put("email", "Este e-mail já está cadastrado.");
         }
-
         if (usuarioRepository.findByWhatsapp(usuario.getWhatsapp()).isPresent()) {
             erros.put("whatsapp", "Este WhatsApp já está cadastrado.");
         }
-
         if (usuarioRepository.findByCpf(usuario.getCpf()).isPresent()) {
             erros.put("cpf", "Este CPF já está cadastrado.");
         }
@@ -163,6 +186,7 @@ public class AuthController {
             Empresa nova = new Empresa();
             nova.setNome(nomeEmpresa);
             nova.setCnpj(cnpjLimpo);
+            nova.setWhatsapp(whatsappEmpresaLimpo);
             nova.setAtivo(true);
             nova.setDiasRestantes(7);
             Empresa salva = empresaRepository.save(nova);
@@ -173,17 +197,41 @@ public class AuthController {
             usuario.setAprovado(true);
             usuario.setEmpresa(salva);
 
+            // 🛡️ SHARK SECURITY: O criador da empresa é o Administrador Principal (Root)
+            usuario.setRoot(true);
+
             usuarioRepository.save(usuario);
 
-            // 📧 DISPARO DE BOAS-VINDAS SHARK (Layout Padronizado)
-            emailService.enviarBoasVindasEmpresa(
-                    usuario.getEmail(),
-                    nomeEmpresa,
-                    cnpjLimpo,
-                    usuario.getUsername(),
-                    usuario.getCpf(),
-                    usuario.getWhatsapp()
-            );
+            String whatsappDestino = (whatsappEmpresaLimpo != null && !whatsappEmpresaLimpo.isBlank())
+                    ? whatsappEmpresaLimpo
+                    : usuario.getWhatsapp();
+            log.info("Destino WhatsApp boas-vindas empresa '{}': {}", nomeEmpresa, whatsappDestino);
+
+            try {
+                whatsappService.enviarBoasVindasEmpresa(
+                        whatsappDestino,
+                        nomeEmpresa,
+                        usuario.getUsername(),
+                        usuario.getCpf()
+                );
+                log.info("Disparo de WhatsApp de boas-vindas concluido para empresa '{}'", nomeEmpresa);
+            } catch (Exception ex) {
+                log.error("Falha ao enviar WhatsApp de boas-vindas da empresa {} para {}: {}", nomeEmpresa, whatsappDestino, ex.getMessage());
+            }
+
+            try {
+                emailService.enviarBoasVindasEmpresa(
+                        usuario.getEmail(),
+                        nomeEmpresa,
+                        cnpjLimpo,
+                        usuario.getUsername(),
+                        usuario.getCpf(),
+                        usuario.getWhatsapp()
+                );
+                log.info("Disparo de e-mail de boas-vindas concluido para empresa '{}'", nomeEmpresa);
+            } catch (Exception ex) {
+                log.error("Falha ao enviar e-mail de boas-vindas da empresa {} para {}: {}", nomeEmpresa, usuario.getEmail(), ex.getMessage());
+            }
 
             return ResponseEntity.ok(Map.of("status", "sucesso"));
 
@@ -205,6 +253,7 @@ public class AuthController {
                     usuarioRepository.save(user);
 
                     emailService.enviarEmailRecuperacao(user.getEmail(), token);
+                    whatsappService.enviarRecuperacaoSenha(user.getWhatsapp(), token);
 
                     return ResponseEntity.ok("Instruções de recuperação enviadas para o e-mail: " + user.getEmail());
                 })

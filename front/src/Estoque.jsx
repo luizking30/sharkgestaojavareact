@@ -1,9 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import api from './api';
+import { unwrapPage } from './utils/pageResponse';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import SharkPagination from './components/SharkPagination';
+import { useFeedback } from './context/FeedbackContext';
+
+const PAGE_SIZE = 20;
 
 const Estoque = ({ usuarioLogado }) => {
     const queryClient = useQueryClient();
+    const { notify, confirmDialog } = useFeedback();
+    const [page, setPage] = useState(0);
 
     // Estados do formulário
     const [formData, setFormData] = useState({
@@ -17,25 +24,39 @@ const Estoque = ({ usuarioLogado }) => {
     const [editando, setEditando] = useState(false);
     const isAdmin = usuarioLogado?.role === 'ROLE_ADMIN';
 
-    // 1. BUSCA DE PRODUTOS VIA REACT QUERY
-    const { data: produtos = [], isLoading } = useQuery({
-        queryKey: ['estoque-produtos'],
+    const { data: pageData, isLoading } = useQuery({
+        queryKey: ['estoque-produtos', page],
         queryFn: async () => {
-            const response = await api.get('/api/estoque');
-            return response.data;
-        }
+            const response = await api.get('/api/estoque', {
+                params: { page, size: PAGE_SIZE, sort: 'nome,asc' },
+            });
+            return unwrapPage(response.data);
+        },
+    });
+
+    const produtos = pageData?.items ?? [];
+    const totalElements = pageData?.totalElements ?? 0;
+    const totalPages = pageData?.totalPages ?? 1;
+
+    const { data: resumo } = useQuery({
+        queryKey: ['estoque-resumo-financeiro'],
+        queryFn: async () => {
+            const res = await api.get('/api/estoque/resumo-financeiro');
+            return res.data;
+        },
     });
 
     // 2. MUTATION PARA SALVAR/ATUALIZAR
     const saveMutation = useMutation({
         mutationFn: (novoProduto) => api.post('/api/estoque/salvar', novoProduto),
-        onSuccess: () => {
+        onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ['estoque-produtos'] });
+            queryClient.invalidateQueries({ queryKey: ['estoque-resumo-financeiro'] });
             queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] }); // Sincroniza Dashboard
-            alert(editando ? "Produto atualizado!" : "Produto salvo!");
+            notify.success(variables?.id ? 'Produto atualizado!' : 'Produto salvo!', 'Estoque');
             limparFormulario();
         },
-        onError: () => alert("Erro ao salvar no estoque.")
+        onError: () => notify.error('Erro ao salvar no estoque.', 'Estoque')
     });
 
     // 3. MUTATION PARA DELETAR
@@ -43,21 +64,18 @@ const Estoque = ({ usuarioLogado }) => {
         mutationFn: (id) => api.delete(`/api/estoque/deletar/${id}`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['estoque-produtos'] });
+            queryClient.invalidateQueries({ queryKey: ['estoque-resumo-financeiro'] });
             queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] }); // Sincroniza Dashboard
         },
-        onError: () => alert("Erro ao deletar.")
+        onError: () => notify.error('Erro ao excluir o produto.', 'Estoque')
     });
 
     // Cálculos Financeiros
-    const financeiro = useMemo(() => {
-        const totalInvestido = produtos.reduce((acc, p) => acc + (p.precoCusto * p.quantidade), 0);
-        const faturamentoBruto = produtos.reduce((acc, p) => acc + (p.precoVenda * p.quantidade), 0);
-        return {
-            investido: totalInvestido,
-            faturamento: faturamentoBruto,
-            lucro: faturamentoBruto - totalInvestido
-        };
-    }, [produtos]);
+    const financeiro = useMemo(() => ({
+        investido: resumo?.investido ?? 0,
+        faturamento: resumo?.faturamento ?? 0,
+        lucro: resumo?.lucro ?? ((resumo?.faturamento ?? 0) - (resumo?.investido ?? 0)),
+    }), [resumo]);
 
     const formatarMoeda = (valor) => {
         return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -73,7 +91,7 @@ const Estoque = ({ usuarioLogado }) => {
         try {
             const response = await api.get(`/api/estoque/buscar-por-codigo?codigo=${codigo}`);
             if (response.data && response.data.id !== formData.id) {
-                alert(`Produto "${response.data.nome}" já cadastrado. Entrando em modo de EDIÇÃO.`);
+                notify.info(`Já existe cadastro com este código: "${response.data.nome}". Abrindo edição.`, 'Produto encontrado');
                 prepararEdicao(response.data);
             }
         } catch (error) { /* Segue como novo produto */ }
@@ -81,7 +99,7 @@ const Estoque = ({ usuarioLogado }) => {
 
     const prepararEdicao = (produto) => {
         if (!isAdmin) {
-            alert("Acesso Negado: Somente administradores podem editar.");
+            notify.warning('Somente administradores podem editar o estoque.', 'Permissão');
             return;
         }
         setFormData(produto);
@@ -96,33 +114,25 @@ const Estoque = ({ usuarioLogado }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!isAdmin) return;
+        if (!isAdmin) {
+            notify.warning('Somente administradores podem alterar o estoque.', 'Permissão');
+            return;
+        }
         saveMutation.mutate(formData);
     };
 
-    const handleDeletar = (id) => {
-        if (!isAdmin) return;
-        if (window.confirm('Remover este item da Shark?')) {
-            deleteMutation.mutate(id);
+    const handleDeletar = async (id) => {
+        if (!isAdmin) {
+            notify.warning('Somente administradores podem excluir itens.', 'Permissão');
+            return;
         }
+        const ok = await confirmDialog('Remover este item do estoque?', 'Excluir produto');
+        if (!ok) return;
+        deleteMutation.mutate(id);
     };
-
-    if (isLoading) return <div className="p-5 text-center text-info">Carregando Inventário Shark...</div>;
 
     return (
         <div className="mt-2">
-            <style>
-                {`
-                .shark-card { background: #1a1a1a; border-radius: 15px; border: none; border-left: 5px solid #333; transition: all 0.3s ease; }
-                .shark-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.5); filter: brightness(1.2); }
-                .border-left-danger { border-left-color: #dc3545 !important; }
-                .border-left-info { border-left-color: #0dcaf0 !important; }
-                .border-left-success { border-left-color: #198754 !important; }
-                .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
-                .btn-readonly { opacity: 0.5; cursor: not-allowed !important; filter: grayscale(1); }
-                `}
-            </style>
-
             <div className="mb-4">
                 <h2 className="fw-bold mb-0 text-white">
                     <i className="bi bi-box-seam glow-info" style={{ color: '#0dcaf0' }}></i> Controle de Estoque
@@ -130,7 +140,7 @@ const Estoque = ({ usuarioLogado }) => {
                 <p className="text-white-50 small">Gerencie entrada, saída e performance financeira do seu inventário</p>
             </div>
 
-            <div className="card shark-card border-left-info shadow-lg mb-4" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+            <div className="card shark-page-card border-left-info shadow-lg mb-4">
                 <div className="card-body p-4">
                     <form onSubmit={handleSubmit} className="row g-3 align-items-end">
                         <div className="col-md-2">
@@ -161,7 +171,7 @@ const Estoque = ({ usuarioLogado }) => {
                         </div>
                         <div className="col-md-2">
                             <div className="d-flex gap-2">
-                                <button type="submit" disabled={saveMutation.isPending} className={`btn btn-info w-100 fw-bold ${!isAdmin ? 'btn-readonly' : ''}`}>
+                                <button type="submit" disabled={saveMutation.isPending} className={`btn btn-shark-primary w-100 ${!isAdmin ? 'btn-readonly' : ''}`}>
                                     <i className={editando ? "bi bi-check-lg" : "bi bi-plus-circle"}></i> {editando ? 'ATUALIZAR' : 'SALVAR'}
                                 </button>
                                 {editando && (
@@ -177,19 +187,19 @@ const Estoque = ({ usuarioLogado }) => {
 
             <div className="row g-3 mb-4">
                 <div className="col-md-4">
-                    <div className="card p-3 shark-card border-left-danger shadow-sm">
+                    <div className="card p-3 shark-page-card border-left-danger shadow-sm">
                         <p className="text-danger small fw-bold mb-1 text-uppercase">Total Investido</p>
                         <h3 className="fw-bold text-white mb-0">{formatarMoeda(financeiro.investido)}</h3>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card p-3 shark-card border-left-success shadow-sm">
+                    <div className="card p-3 shark-page-card border-left-success shadow-sm">
                         <p className="text-success small fw-bold mb-1 text-uppercase">Faturamento Bruto</p>
                         <h3 className="fw-bold text-white mb-0">{formatarMoeda(financeiro.faturamento)}</h3>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card p-3 shark-card border-left-info shadow-sm">
+                    <div className="card p-3 shark-page-card border-left-info shadow-sm">
                         <p className="text-info small fw-bold mb-1 text-uppercase">Lucro Líquido Previsto</p>
                         <h3 className="fw-bold text-white mb-0">{formatarMoeda(financeiro.lucro)}</h3>
                     </div>
@@ -211,7 +221,10 @@ const Estoque = ({ usuarioLogado }) => {
                         </tr>
                         </thead>
                         <tbody>
-                        {produtos.map(p => (
+                        {isLoading ? (
+                            <tr><td colSpan={7} className="text-center py-4 text-info">Carregando…</td></tr>
+                        ) : (
+                        produtos.map(p => (
                             <tr key={p.id}>
                                 <td className="ps-4 text-start fw-bold text-info">{p.codigoBarras || 'S/C'}</td>
                                 <td className="text-start fw-bold">{p.nome}</td>
@@ -233,11 +246,21 @@ const Estoque = ({ usuarioLogado }) => {
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                        ))
+                        )}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            <SharkPagination
+                page={page}
+                totalPages={totalPages}
+                totalElements={totalElements}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                disabled={isLoading}
+            />
         </div>
     );
 };

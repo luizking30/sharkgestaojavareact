@@ -1,36 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 // IMPORTAÇÃO DO REACT QUERY
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { FeedbackProvider } from './context/FeedbackContext';
 
-// Importação da Base
+// Shell e login ficam no bundle inicial (entrada rápida)
 import Login from './Login';
 import Layout from './Layout';
-import MovimentacaoDia from './MovimentacaoDia';
 
-// Importação de todos os módulos convertidos
-import Clientes from './Clientes';
-import Estoque from './Estoque';
-import OrdensServico from './OrdensServico';
-import Vendas from './Vendas';
-import Contas from './Contas';
-import Relatorios from './Relatorios';
-import RelatorioMensal from './RelatorioMensal';
-import MeuPainel from './MeuPainel';
-import AdminEmpresa from './AdminEmpresa';
-import Pagamento from './Pagamento';
-import PagamentoPix from './PagamentoPix';
-import NovaSenha from './NovaSenha';
+const MovimentacaoDia = lazy(() => import('./MovimentacaoDia'));
+const Clientes = lazy(() => import('./Clientes'));
+const Estoque = lazy(() => import('./Estoque'));
+const OrdensServico = lazy(() => import('./OrdensServico'));
+const Vendas = lazy(() => import('./Vendas'));
+const Contas = lazy(() => import('./Contas'));
+const Relatorios = lazy(() => import('./Relatorios'));
+const RelatorioMensal = lazy(() => import('./RelatorioMensal'));
+const MeuPainel = lazy(() => import('./MeuPainel'));
+const AdminEmpresa = lazy(() => import('./AdminEmpresa'));
+const Pagamento = lazy(() => import('./Pagamento'));
+const PagamentoPix = lazy(() => import('./PagamentoPix'));
+const NovaSenha = lazy(() => import('./NovaSenha'));
+const RegistroEmpresa = lazy(() => import('./RegistroEmpresa'));
+const RegistroFuncionario = lazy(() => import('./RegistroFuncionario'));
+const SuperAdmin = lazy(() => import('./SuperAdmin'));
 
-// Importação dos registros
-import RegistroEmpresa from './RegistroEmpresa';
-import RegistroFuncionario from './RegistroFuncionario';
-
-// 🚀 NOVO MÓDULO: ADM GERAL (SaaS Owner)
-import SuperAdmin from './SuperAdmin';
+function RouteFallback() {
+  return (
+    <div className="d-flex justify-content-center align-items-center min-vh-100">
+      <div className="text-center text-info">
+        <div className="spinner-border mb-2" role="status" aria-hidden="true" />
+        <p className="small mb-0">Carregando módulo…</p>
+      </div>
+    </div>
+  );
+}
 
 // 1. CRIAR O CLIENTE FORA DO COMPONENTE
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 30_000,
+            gcTime: 5 * 60_000,
+            refetchOnWindowFocus: false,
+            retry: 1,
+        },
+    },
+});
 
 function App() {
   /**
@@ -74,7 +90,9 @@ function App() {
   return (
       // 2. ENVOLVER COM O PROVIDER
       <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
         <Router>
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* ROTAS PÚBLICAS */}
             <Route
@@ -95,6 +113,7 @@ function App() {
             <Route path="/relatorios" element={<PrivateRoute><Relatorios usuarioLogado={usuarioLogado} /></PrivateRoute>} />
             <Route path="/relatorios/mensal" element={<PrivateRoute><RelatorioMensal /></PrivateRoute>} />
             <Route path="/meu-painel" element={<PrivateRoute><MeuPainel usuarioLogado={usuarioLogado} /></PrivateRoute>} />
+            <Route path="/ganhos" element={<Navigate to="/meu-painel" replace />} />
 
             {/* 🛡️ ROTA ADM DA EMPRESA (Donos de Loja) */}
             <Route path="/admin/empresa" element={
@@ -121,7 +140,9 @@ function App() {
             {/* ROTA "CORINGA" */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </Router>
+        </FeedbackProvider>
       </QueryClientProvider>
   );
 }

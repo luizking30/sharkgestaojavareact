@@ -42,4 +42,9 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
     // --- MÉTODOS DE COMPATIBILIDADE ---
     // Dica: Tente evitar usar este método em produção para não misturar dados de empresas diferentes
     List<Conta> findAllByOrderByDataVencimentoAsc();
+
+    List<Conta> findByRecorrenteIsTrueAndDataVencimentoBetween(LocalDate inicio, LocalDate fim);
+
+    boolean existsByEmpresaIdAndDescricaoIgnoreCaseAndDataVencimentoBetween(
+            Long empresaId, String descricao, LocalDate inicio, LocalDate fim);
 }

@@ -10,6 +10,7 @@ function RegistroEmpresa() {
     const [formData, setFormData] = useState({
         nomeEmpresa: '',
         cnpj: '',
+        whatsappEmpresa: '',
         nome: '',
         cpf: '',
         email: '',
@@ -50,11 +51,17 @@ function RegistroEmpresa() {
         }
 
         // Máscara de WhatsApp
-        if (name === 'whatsapp') {
-            v = v.replace(/\D/g, '');
-            if (v.length > 2) v = "(" + v.substring(0, 2) + ") " + v.substring(2);
-            if (v.length > 9) v = v.substring(0, 10) + "-" + v.substring(10);
-            if (v.length > 15) v = v.substring(0, 15);
+        if (name === 'whatsapp' || name === 'whatsappEmpresa') {
+            const raw = v.replace(/\D/g, '').substring(0, 11);
+            if (raw.length > 10) {
+                v = `(${raw.substring(0, 2)}) ${raw.substring(2, 7)}-${raw.substring(7)}`;
+            } else if (raw.length > 6) {
+                v = `(${raw.substring(0, 2)}) ${raw.substring(2, 6)}-${raw.substring(6)}`;
+            } else if (raw.length > 2) {
+                v = `(${raw.substring(0, 2)}) ${raw.substring(2)}`;
+            } else {
+                v = raw;
+            }
         }
 
         setFormData({ ...formData, [name]: v });
@@ -64,10 +71,12 @@ function RegistroEmpresa() {
     const validarLocalmente = () => {
         let novosErros = {};
         if (formData.nomeEmpresa.trim().length < 3) novosErros.nomeEmpresa = "Nome da empresa obrigatório!";
+        if (formData.cnpj.replace(/\D/g, '').length > 0 && formData.cnpj.replace(/\D/g, '').length < 14) novosErros.cnpj = "CNPJ incompleto!";
+        if (formData.whatsappEmpresa.replace(/\D/g, '').length < 11) novosErros.whatsappEmpresa = "WhatsApp da empresa incompleto!";
         if (formData.nome.trim().length < 3) novosErros.nome = "Nome do proprietário obrigatório!";
         if (formData.cpf.replace(/\D/g, '').length < 11) novosErros.cpf = "CPF incompleto!";
         if (!formData.email.includes('@')) novosErros.email = "E-mail inválido!";
-        if (formData.whatsapp.replace(/\D/g, '').length < 10) novosErros.whatsapp = "WhatsApp incompleto!";
+        if (formData.whatsapp.replace(/\D/g, '').length < 11) novosErros.whatsapp = "WhatsApp incompleto!";
         if (formData.username.trim().length < 3) novosErros.username = "Login muito curto!";
         if (formData.password.length < 4) novosErros.password = "A senha deve ter no mínimo 4 caracteres!";
 
@@ -84,7 +93,7 @@ function RegistroEmpresa() {
         setLoading(true);
         setErros({});
 
-        const endpoint = `/api/auth/registro-empresa?nomeEmpresa=${encodeURIComponent(formData.nomeEmpresa)}&cnpj=${encodeURIComponent(formData.cnpj)}`;
+        const endpoint = `/api/auth/registro-empresa?nomeEmpresa=${encodeURIComponent(formData.nomeEmpresa)}&cnpj=${encodeURIComponent(formData.cnpj)}&whatsappEmpresa=${encodeURIComponent(formData.whatsappEmpresa)}`;
 
         try {
             await api.post(endpoint, {
@@ -154,6 +163,15 @@ function RegistroEmpresa() {
                             <label><i className="bi bi-card-checklist me-2"></i>CNPJ (Opcional)</label>
                         </div>
                         {erros.cnpj && <ErrorLabel msg={erros.cnpj} />}
+                    </div>
+
+                    <div className="mb-3">
+                        <div className="form-floating">
+                            <input type="text" name="whatsappEmpresa" className={`form-control ${erros.whatsappEmpresa ? 'is-invalid-shark' : ''}`}
+                                   placeholder="(00) 00000-0000" onChange={handleInputChange} value={formData.whatsappEmpresa} required disabled={loading} />
+                            <label><i className="bi bi-whatsapp me-2"></i>WhatsApp da Empresa *</label>
+                        </div>
+                        {erros.whatsappEmpresa && <ErrorLabel msg={erros.whatsappEmpresa} />}
                     </div>
 
                     <div className="section-title">Dados do Proprietário</div>

@@ -1,8 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import api from './api';
+import { useFeedback } from './context/FeedbackContext';
+
+const getApiErrorMessage = (err, fallback) => {
+    const data = err?.response?.data;
+    if (!data) return fallback;
+    if (typeof data === 'string') return data;
+    if (typeof data?.message === 'string') return data.message;
+    if (typeof data?.error === 'string') return data.error;
+    if (typeof data === 'object') {
+        const values = Object.values(data).filter((v) => typeof v === 'string' && v.trim());
+        if (values.length) return values.join(' | ');
+    }
+    return fallback;
+};
 
 const Pagamento = () => {
+    const { notify } = useFeedback();
+    const navigate = useNavigate();
     const [dias, setDias] = useState(30);
     const [loading, setLoading] = useState(false);
     const precoDia = 2.00;
@@ -13,17 +30,17 @@ const Pagamento = () => {
         e.preventDefault();
         setLoading(true);
         try {
-            // Ajuste o endpoint conforme seu Controller Java
-            const res = await api.post('/api/pagamento/gerar-pix', { quantidadeDias: dias });
-            
-            // Aqui você pode redirecionar para uma tela de QR Code ou 
-            // abrir o link do Mercado Pago em uma nova aba
-            if (res.data.checkoutUrl) {
-                window.location.href = res.data.checkoutUrl;
-            }
+            const res = await api.post(`/api/admin/empresa/gerar-renovacao?dias=${dias}`);
+            navigate('/pagamento-pix', {
+                state: {
+                    qrCodeBase64: res.data?.qr_code_base64,
+                    copiaECola: res.data?.qr_code,
+                    diasAntesDaCompra: res.data?.dias_anteriores || 0
+                }
+            });
         } catch (err) {
             console.error("Erro ao gerar pagamento:", err);
-            alert("Erro ao conectar com o gateway de pagamento.");
+            notify.error(getApiErrorMessage(err, 'Erro ao conectar com o gateway de pagamento.'), 'Pagamento');
         } finally {
             setLoading(false);
         }
@@ -31,29 +48,6 @@ const Pagamento = () => {
 
     return (
         <div className="row justify-content-center animate__animated animate__fadeIn">
-            <style>
-                {`
-                .input-dias {
-                    background: #000 !important;
-                    color: #ffc107 !important;
-                    border: 2px solid #334155 !important;
-                    font-size: 1.5rem;
-                    font-weight: bold;
-                    text-align: center;
-                    border-radius: 15px;
-                }
-                .input-dias:focus {
-                    border-color: #ffc107 !important;
-                    box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
-                }
-                .card-pagamento {
-                    border-radius: 20px;
-                    border: 2px solid #ffc107 !important;
-                    background-color: #1e293b !important;
-                }
-                `}
-            </style>
-
             <div className="col-md-6">
                 <div className="card card-pagamento shadow-lg">
                     <div className="card-body p-5 text-center">
@@ -73,7 +67,7 @@ const Pagamento = () => {
                                 </label>
                                 <input 
                                     type="number" 
-                                    className="form-control input-dias mx-auto"
+                                    className="form-control input-dias-pagamento mx-auto"
                                     style={{ maxWidth: '150px' }}
                                     value={dias}
                                     min="5"

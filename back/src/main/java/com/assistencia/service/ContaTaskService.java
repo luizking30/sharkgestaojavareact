@@ -16,44 +16,49 @@ public class ContaTaskService {
     private ContaRepository contaRepository;
 
     /**
-     * 🚀 TAREFA AUTOMÁTICA DA SHARK
      * Roda todo dia 1º de cada mês, à 00:01.
-     * Objetivo: Clonar contas recorrentes do mês passado para o mês atual.
+     * Clona contas recorrentes do mês passado para o mês atual (por empresa).
      */
     @Scheduled(cron = "0 1 0 1 * ?")
     public void processarContasRecorrentes() {
         LocalDate hoje = LocalDate.now();
         LocalDate mesPassado = hoje.minusMonths(1);
+        LocalDate inicioMesPassado = mesPassado.withDayOfMonth(1);
+        LocalDate fimMesPassado = mesPassado.withDayOfMonth(mesPassado.lengthOfMonth());
 
-        // Busca todas as contas do banco
-        List<Conta> todasContas = contaRepository.findAll();
+        LocalDate inicioMesAtual = hoje.withDayOfMonth(1);
+        LocalDate fimMesAtual = hoje.withDayOfMonth(hoje.lengthOfMonth());
 
-        for (Conta antiga : todasContas) {
-            // Filtra: Tem que ser recorrente e ter vencido no mês passado
-            if (antiga.isRecorrente() && antiga.getDataVencimento().getMonth() == mesPassado.getMonth()) {
+        List<Conta> candidatas = contaRepository.findByRecorrenteIsTrueAndDataVencimentoBetween(
+                inicioMesPassado, fimMesPassado);
 
-                // Evita duplicados: Verifica se já existe uma conta com mesma descrição neste mês/ano
-                boolean jaExiste = todasContas.stream().anyMatch(c ->
-                        c.getDescricao().equalsIgnoreCase(antiga.getDescricao()) &&
-                                c.getDataVencimento().getMonth() == hoje.getMonth() &&
-                                c.getDataVencimento().getYear() == hoje.getYear()
-                );
-
-                if (!jaExiste) {
-                    Conta nova = new Conta();
-                    nova.setDescricao(antiga.getDescricao());
-                    nova.setValor(antiga.getValor());
-                    nova.setRecorrente(true);
-                    nova.setPaga(false); // Nasce como pendência no novo mês
-
-                    // Mantém o dia do vencimento original (ex: dia 10)
-                    int diaOriginal = antiga.getDataVencimento().getDayOfMonth();
-                    int ultimoDiaDesteMes = hoje.lengthOfMonth();
-                    nova.setDataVencimento(hoje.withDayOfMonth(Math.min(diaOriginal, ultimoDiaDesteMes)));
-
-                    contaRepository.save(nova);
-                }
+        for (Conta antiga : candidatas) {
+            if (antiga.getEmpresa() == null) {
+                continue;
             }
+            Long empresaId = antiga.getEmpresa().getId();
+            boolean jaExiste = contaRepository.existsByEmpresaIdAndDescricaoIgnoreCaseAndDataVencimentoBetween(
+                    empresaId,
+                    antiga.getDescricao(),
+                    inicioMesAtual,
+                    fimMesAtual
+            );
+            if (jaExiste) {
+                continue;
+            }
+
+            Conta nova = new Conta();
+            nova.setEmpresa(antiga.getEmpresa());
+            nova.setDescricao(antiga.getDescricao());
+            nova.setValor(antiga.getValor());
+            nova.setRecorrente(true);
+            nova.setPaga(false);
+
+            int diaOriginal = antiga.getDataVencimento().getDayOfMonth();
+            int ultimoDiaDesteMes = hoje.lengthOfMonth();
+            nova.setDataVencimento(hoje.withDayOfMonth(Math.min(diaOriginal, ultimoDiaDesteMes)));
+
+            contaRepository.save(nova);
         }
     }
 }

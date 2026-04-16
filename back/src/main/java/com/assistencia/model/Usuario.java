@@ -43,6 +43,10 @@ public class Usuario {
     @Column(nullable = false)
     private boolean aprovado = false;
 
+    // 🛡️ TRAVA SHARK: Define se o usuário é o administrador raiz (imune a exclusão)
+    @Column(name = "is_root", nullable = false)
+    private boolean isRoot = false;
+
     @Column(length = 20)
     private String tipoFuncionario;
 
@@ -111,6 +115,7 @@ public class Usuario {
         this.aprovado = aprovado;
         this.tipoFuncionario = tipoFuncionario;
         this.empresa = empresa;
+        this.isRoot = false; // Por padrão, construtor comum cria usuários não-root
     }
 
     // Getters e Setters
@@ -136,10 +141,21 @@ public class Usuario {
     public void setPassword(String password) { this.password = password; }
 
     public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
+    public void setRole(String role) {
+        String roleAtualNorm = normalizeRole(this.role);
+        String novaRoleNorm = normalizeRole(role);
+        // Blindagem global: OWNER não pode ser rebaixado por nenhum fluxo.
+        if (isOwnerRole(roleAtualNorm) && !isOwnerRole(novaRoleNorm)) {
+            return;
+        }
+        this.role = role;
+    }
 
     public boolean isAprovado() { return aprovado; }
     public void setAprovado(boolean aprovado) { this.aprovado = aprovado; }
+
+    public boolean isRoot() { return isRoot; }
+    public void setRoot(boolean root) { isRoot = root; }
 
     public String getTipoFuncionario() { return tipoFuncionario; }
     public void setTipoFuncionario(String tipoFuncionario) { this.tipoFuncionario = tipoFuncionario; }
@@ -158,6 +174,17 @@ public class Usuario {
 
     public LocalDateTime getTokenExpiration() { return tokenExpiration; }
     public void setTokenExpiration(LocalDateTime tokenExpiration) { this.tokenExpiration = tokenExpiration; }
+
+    private String normalizeRole(String value) {
+        if (value == null) return "";
+        String v = value.trim().toUpperCase();
+        return v.startsWith("ROLE_") ? v : "ROLE_" + v;
+    }
+
+    private boolean isOwnerRole(String normalizedRole) {
+        // Aceita variações legadas (OWNER, ROLE_OWNER, RULE_OWNER, etc.)
+        return normalizedRole != null && normalizedRole.contains("OWNER");
+    }
 
     public Double getTotalComissaoOsAcumulada() { return totalComissaoOsAcumulada; }
     public void setTotalComissaoOsAcumulada(Double totalComissaoOsAcumulada) { this.totalComissaoOsAcumulada = totalComissaoOsAcumulada; }

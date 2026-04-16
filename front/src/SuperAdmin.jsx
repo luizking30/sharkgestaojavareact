@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import api from './api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useFeedback } from './context/FeedbackContext';
 
 const SuperAdmin = () => {
     const queryClient = useQueryClient();
+    const { notify, confirmDialog, promptDialog } = useFeedback();
     const [filtro, setFiltro] = useState('');
 
     // 1. BUSCA DADOS DO ECOSSISTEMA
@@ -19,8 +21,8 @@ const SuperAdmin = () => {
     const addDiasMutation = useMutation({
         mutationFn: ({ id, dias }) => api.post(`/api/super-admin/empresas/adicionar-dias/${id}?quantidade=${dias}`),
         onSuccess: () => {
-            queryClient.invalidateQueries(['super-admin-empresas']);
-            alert("Dias adicionados com sucesso!");
+            queryClient.invalidateQueries({ queryKey: ['super-admin-empresas'] });
+            notify.success('Dias adicionados com sucesso.', 'Super admin');
         }
     });
 
@@ -28,8 +30,8 @@ const SuperAdmin = () => {
     const bloquearMutation = useMutation({
         mutationFn: (id) => api.post(`/api/super-admin/empresas/bloquear/${id}`),
         onSuccess: () => {
-            queryClient.invalidateQueries(['super-admin-empresas']);
-            alert("Acesso da empresa suspenso!");
+            queryClient.invalidateQueries({ queryKey: ['super-admin-empresas'] });
+            notify.warning('Acesso da empresa suspenso.', 'Super admin');
         }
     });
 
@@ -47,16 +49,6 @@ const SuperAdmin = () => {
 
     return (
         <div className="mt-2 text-white">
-            <style>
-                {`
-                .card-super { background: #0f172a; border: 1px solid #1e293b; border-radius: 15px; }
-                .table-shark-admin { border-radius: 10px; overflow: hidden; }
-                .badge-owner { background: #fbbf24; color: #000; font-weight: 800; font-size: 0.65rem; }
-                .valor-mono { font-family: 'JetBrains Mono', monospace; }
-                .btn-action { padding: 2px 8px; font-size: 0.75rem; font-weight: 700; }
-                `}
-            </style>
-
             <div className="d-flex justify-content-between align-items-end mb-4">
                 <div>
                     <h2 className="fw-bold text-warning"><i className="bi bi-crown-fill me-2"></i> Painel Global (Fundador)</h2>
@@ -111,16 +103,16 @@ const SuperAdmin = () => {
                             <tr key={emp.id}>
                                 <td className="ps-4">
                                     <div className="fw-bold">{emp.nome}</div>
-                                    <span className="text-muted small valor-mono">ID: #{emp.id}</span>
+                                    <span className="text-muted small val-mono">ID: #{emp.id}</span>
                                 </td>
-                                <td className="valor-mono small">{emp.cnpj}</td>
+                                <td className="val-mono small">{emp.cnpj}</td>
                                 <td>
                                     {emp.proprietarios.map(p => (
                                         <div key={p} className="small"><i className="bi bi-person-fill text-warning me-1"></i>{p}</div>
                                     ))}
                                 </td>
                                 <td className="text-center">
-                                    <button className="btn btn-sm btn-outline-info rounded-pill btn-action" onClick={() => alert("Equipe:\n" + emp.listaEquipe.join("\n"))}>
+                                    <button type="button" className="btn btn-sm btn-outline-info rounded-pill btn-super-action" onClick={() => notify.info(emp.listaEquipe?.length ? emp.listaEquipe.join(' · ') : 'Sem colaboradores listados.', `Equipe — ${emp.nome}`)}>
                                         {emp.totalFuncionarios} Colaboradores
                                     </button>
                                 </td>
@@ -132,18 +124,23 @@ const SuperAdmin = () => {
                                 <td className="pe-4 text-end">
                                     <div className="btn-group gap-1">
                                         <button
-                                            className="btn btn-sm btn-success btn-action"
-                                            onClick={() => {
-                                                const d = prompt("Quantos dias bônus?");
-                                                if(d) addDiasMutation.mutate({ id: emp.id, dias: d });
+                                            type="button"
+                                            className="btn btn-sm btn-success btn-super-action"
+                                            onClick={async () => {
+                                                const d = await promptDialog('Informe a quantidade de dias de bônus.', 'Adicionar dias', '30');
+                                                if (d != null && String(d).trim()) {
+                                                    addDiasMutation.mutate({ id: emp.id, dias: String(d).trim() });
+                                                }
                                             }}
                                         >
                                             + DIAS
                                         </button>
                                         <button
-                                            className="btn btn-sm btn-outline-danger btn-action"
-                                            onClick={() => {
-                                                if(confirm(`Bloquear ${emp.nome} imediatamente?`)) bloquearMutation.mutate(emp.id);
+                                            type="button"
+                                            className="btn btn-sm btn-outline-danger btn-super-action"
+                                            onClick={async () => {
+                                                const ok = await confirmDialog(`Bloquear ${emp.nome} imediatamente?`, 'Suspender empresa');
+                                                if (ok) bloquearMutation.mutate(emp.id);
                                             }}
                                         >
                                             BLOQUEAR

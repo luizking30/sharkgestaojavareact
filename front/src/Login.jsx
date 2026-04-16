@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from './api';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import './Login.css';
 
@@ -30,7 +30,7 @@ function Login() {
     setSuccessMsg('');
 
     try {
-      const response = await axios.post('http://localhost:8080/api/auth/login', {
+      const response = await api.post('/api/auth/login', {
         username,
         password
       });
@@ -61,7 +61,7 @@ function Login() {
 
     try {
       // O Java agora retorna: "Instruções de recuperação enviadas para o e-mail: xxxx@xxx.com"
-      const response = await axios.post(`http://localhost:8080/api/auth/esqueci-senha?identificador=${identificador}`);
+      const response = await api.post(`/api/auth/esqueci-senha?identificador=${encodeURIComponent(identificador)}`);
 
       setSuccessMsg(response.data); // Exibe a frase dinâmica com o e-mail
       setIsRecovery(false); // Volta para tela de login com o card de sucesso visível

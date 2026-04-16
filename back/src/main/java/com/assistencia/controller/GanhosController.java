@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/ganhos")
+@RequestMapping("/api/usuarios")
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class GanhosController {
 
@@ -32,7 +32,7 @@ public class GanhosController {
         this.pagamentoRepo = pagamentoRepo;
     }
 
-    @GetMapping("/meus-ganhos")
+    @GetMapping("/meu-extrato")
     public ResponseEntity<?> meusGanhos() {
         Usuario usuarioLogado = securityUtils.getUsuarioLogado();
         if (usuarioLogado == null) return ResponseEntity.status(401).build();
@@ -44,7 +44,7 @@ public class GanhosController {
         // 1. HISTÓRICO DE PAGAMENTOS (Filtrado por Funcionário)
         List<PagamentoComissao> historico = pagamentoRepo.findByFuncionarioIdOrderByDataHoraDesc(idU);
 
-        // Define a data de corte baseada no último pagamento recebido
+        // Define a data de corte baseada no último pagamento recebido para não somar o que já foi pago
         LocalDateTime corteOs = historico.stream()
                 .filter(p -> "OS".equals(p.getTipoComissao()))
                 .map(PagamentoComissao::getDataHora).findFirst()
@@ -55,9 +55,9 @@ public class GanhosController {
                 .map(PagamentoComissao::getDataHora).findFirst()
                 .orElse(LocalDateTime.of(2000, 1, 1, 0, 0));
 
-        // 2. VENDAS (ISOLAMENTO SaaS: Busca por Empresa + Vendedor + Período)
-        List<Venda> vendasNovas = vendaRepo.findByEmpresaIdAndVendedorIdAndDataHoraBetween(
-                empresaId, idU, corteVenda, LocalDateTime.now());
+        // 2. VENDAS (ISOLAMENTO SaaS: Busca por Empresa + Vendedor + Período pós-último pagamento)
+        List<Venda> vendasNovas = vendaRepo.findByEmpresaIdAndVendedorIdAndDataHoraAfter(
+                empresaId, idU, corteVenda);
 
         BigDecimal brutoVenda = vendasNovas.stream()
                 .map(v -> BigDecimal.valueOf(v.getValorTotal() != null ? v.getValorTotal() : 0.0))
@@ -67,8 +67,8 @@ public class GanhosController {
                 .map(v -> BigDecimal.valueOf(v.getComissaoVendedorValor() != null ? v.getComissaoVendedorValor() : 0.0))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 3. ORDENS DE SERVIÇO (Filtrado por Técnico e Status 'Entregue')
-        List<OrdemServico> servicosNovos = ordemRepo.findByEmpresaIdAndStatusAndFuncionarioAndamentoAndDataEntregaAfter(
+        // 3. ORDENS DE SERVIÇO (Filtrado por Técnico e Status 'Entregue' pós-último pagamento)
+        List<OrdemServico> servicosNovos = ordemRepo.findByEmpresaIdAndStatusAndFuncionarioAndamentoIgnoreCaseAndDataEntregaAfter(
                 empresaId, "Entregue", nomeU, corteOs);
 
         BigDecimal brutoOs = servicosNovos.stream()
@@ -82,24 +82,24 @@ public class GanhosController {
                     }
                     double valorBase = os.getValorTotal() != null ? os.getValorTotal() : 0.0;
                     double custoPecas = os.getCustoPeca() != null ? os.getCustoPeca() : 0.0;
-
                     BigDecimal liq = BigDecimal.valueOf(valorBase - custoPecas);
                     BigDecimal taxa = BigDecimal.valueOf(usuarioLogado.getComissaoOs() != null ? usuarioLogado.getComissaoOs() : 0.0);
                     return liq.multiply(taxa).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 4. MONTAR RESPOSTA PARA O REACT (Objeto HashMap plano)
+        // 🦈 ATUALIZAÇÃO DE SALDO TEMPORÁRIO PARA O OBJETO USUÁRIO
+        usuarioLogado.setSaldoVendaCalculado(comissaoVenda.doubleValue());
+        usuarioLogado.setTotalComissaoOsAcumulada(comissaoOs.doubleValue());
+        usuarioLogado.setBrutoVendaCalculado(brutoVenda.doubleValue());
+        usuarioLogado.setBrutoOsCalculado(brutoOs.doubleValue());
+
+        // 4. MONTAR RESPOSTA COMPATÍVEL COM O MEUPAINEL.JSX
         Map<String, Object> response = new HashMap<>();
-        response.put("vendedor", usuarioLogado.getNome());
-        response.put("brutoVendas", brutoVenda);
-        response.put("comissaoVendas", comissaoVenda);
-        response.put("brutoOs", brutoOs);
-        response.put("comissaoOs", comissaoOs);
-        response.put("totalAReceber", comissaoVenda.add(comissaoOs));
-        response.put("vendasDetalhes", vendasNovas);
-        response.put("osDetalhes", servicosNovos);
-        response.put("historicoPagamentos", historico);
+        response.put("usuario", usuarioLogado); // Envia o objeto com CPF, WhatsApp e Taxas
+        response.put("vendas", vendasNovas);
+        response.put("servicos", servicosNovos);
+        response.put("pagamentos", historico);
 
         return ResponseEntity.ok(response);
     }

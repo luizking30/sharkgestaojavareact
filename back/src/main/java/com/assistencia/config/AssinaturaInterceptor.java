@@ -27,6 +27,8 @@ public class AssinaturaInterceptor implements HandlerInterceptor {
         if (uri.startsWith("/api/auth") ||
                 uri.startsWith("/api/webhook") ||
                 uri.startsWith("/api/pagamento") || // Rota para gerar o PIX deve estar aberta
+                uri.startsWith("/api/admin/empresa/gerar-renovacao") || // Renovação no novo endpoint
+                uri.startsWith("/api/pagamentos/assinatura/status-check") || // Polling de confirmação PIX
                 uri.startsWith("/error")) {
             return true;
         }

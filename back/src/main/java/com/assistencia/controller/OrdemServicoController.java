@@ -13,11 +13,16 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.properties.TextAlignment;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.ByteArrayOutputStream;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -42,20 +47,39 @@ public class OrdemServicoController {
 
     @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO','OWNER')")
     @GetMapping
-    public ResponseEntity<List<OrdemServico>> listar(@RequestParam(required = false) String busca) {
+    public ResponseEntity<?> listar(
+            @RequestParam(required = false) String busca,
+            @RequestParam(required = false) Long id,
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String data,
+            @RequestParam(required = false) String status,
+            @PageableDefault(size = 15, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
         Long empresaId = logado.getEmpresa().getId();
-        List<OrdemServico> ordens;
 
         if (busca != null && !busca.isEmpty()) {
-            ordens = ordemRepo.buscarSugestoesSugestivas(busca, empresaId);
-        } else {
-            ordens = ordemRepo.findByEmpresaIdOrderByIdDesc(empresaId);
+            List<OrdemServico> ordens = ordemRepo.buscarSugestoesSugestivas(busca, empresaId);
+            if (ordens.size() > 200) {
+                ordens = ordens.subList(0, 200);
+            }
+            return ResponseEntity.ok(ordens);
         }
 
-        return ResponseEntity.ok(ordens);
+        LocalDateTime d0 = null;
+        LocalDateTime d1 = null;
+        if (data != null && !data.isBlank()) {
+            LocalDate dia = LocalDate.parse(data);
+            d0 = dia.atStartOfDay();
+            d1 = dia.plusDays(1).atStartOfDay();
+        }
+
+        Long idFiltro = id;
+        String nomeF = (nome != null && !nome.isBlank()) ? nome : null;
+        String statusF = (status != null && !status.isBlank()) ? status : null;
+
+        return ResponseEntity.ok(ordemRepo.findByEmpresaFiltrado(empresaId, idFiltro, nomeF, statusF, d0, d1, pageable));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")

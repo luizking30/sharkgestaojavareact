@@ -5,6 +5,10 @@ import com.assistencia.model.Usuario;
 import com.assistencia.repository.ClienteRepository;
 import com.assistencia.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,17 +34,55 @@ public class ClienteController {
     private UsuarioRepository usuarioRepo;
 
     /**
-     * LISTAR CLIENTES DA EMPRESA LOGADA
+     * LISTAR CLIENTES DA EMPRESA LOGADA (paginado; filtros opcionais por nome, cpf, whatsapp)
      */
     @GetMapping
-    public ResponseEntity<?> listar() {
+    public ResponseEntity<?> listar(
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String cpf,
+            @RequestParam(required = false) String whatsapp,
+            @PageableDefault(size = 15, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
         Usuario logado = getUsuarioLogado();
         if (logado == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Usuário não autenticado.");
         }
 
-        List<Cliente> clientesDaEmpresa = repo.findByEmpresaId(logado.getEmpresa().getId());
+        Long empresaId = logado.getEmpresa().getId();
+        String n = (nome != null && !nome.isBlank()) ? nome : null;
+        String c = (cpf != null && !cpf.isBlank()) ? cpf : null;
+        String w = (whatsapp != null && !whatsapp.isBlank()) ? whatsapp : null;
+
+        Page<Cliente> clientesDaEmpresa = repo.findByEmpresaIdFiltrado(empresaId, n, c, w, pageable);
         return ResponseEntity.ok(clientesDaEmpresa);
+    }
+
+    /**
+     * Verifica CPF ou WhatsApp já cadastrados na empresa (exceto o id informado, para edição).
+     */
+    @GetMapping("/checar-duplicata")
+    public ResponseEntity<Map<String, Boolean>> checarDuplicata(
+            @RequestParam(required = false) String cpf,
+            @RequestParam(required = false) String whatsapp,
+            @RequestParam(required = false) Long excetoId) {
+        Usuario logado = getUsuarioLogado();
+        if (logado == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Long empresaId = logado.getEmpresa().getId();
+
+        if (cpf != null && !cpf.isBlank()) {
+            Optional<Cliente> oc = repo.findByCpfAndEmpresaId(cpf.trim(), empresaId);
+            if (oc.isPresent() && (excetoId == null || !oc.get().getId().equals(excetoId))) {
+                return ResponseEntity.ok(Map.of("duplicado", true));
+            }
+        }
+        if (whatsapp != null && !whatsapp.isBlank()) {
+            Optional<Cliente> ow = repo.findFirstByWhatsappAndEmpresaId(whatsapp.trim(), empresaId);
+            if (ow.isPresent() && (excetoId == null || !ow.get().getId().equals(excetoId))) {
+                return ResponseEntity.ok(Map.of("duplicado", true));
+            }
+        }
+        return ResponseEntity.ok(Map.of("duplicado", false));
     }
 
     /**

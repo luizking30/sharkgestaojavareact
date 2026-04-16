@@ -9,10 +9,28 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 @Repository
 public interface VendaRepository extends JpaRepository<Venda, Long> {
 
     List<Venda> findByEmpresaIdOrderByDataHoraDesc(Long empresaId);
+
+    Page<Venda> findByEmpresaIdOrderByDataHoraDesc(Long empresaId, Pageable pageable);
+
+    @Query("SELECT v FROM Venda v WHERE v.empresa.id = :empresaId "
+            + "AND (:id IS NULL OR v.id = :id) "
+            + "AND (:vend IS NULL OR :vend = '' OR LOWER(COALESCE(v.nomeVendedorNoAto, '')) LIKE LOWER(CONCAT('%', :vend, '%'))) "
+            + "AND (:d0 IS NULL OR v.dataHora >= :d0) "
+            + "AND (:d1 IS NULL OR v.dataHora < :d1)")
+    Page<Venda> findByEmpresaFiltrado(
+            @Param("empresaId") Long empresaId,
+            @Param("id") Long id,
+            @Param("vend") String vendedorNome,
+            @Param("d0") LocalDateTime d0,
+            @Param("d1") LocalDateTime d1,
+            Pageable pageable);
 
     // --- 🚀 DASHBOARD ---
     long countByEmpresaIdAndDataHoraBetween(Long empresaId, LocalDateTime inicio, LocalDateTime fim);
@@ -28,9 +46,10 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
     // Busca básica por período
     List<Venda> findByEmpresaIdAndDataHoraBetween(Long empresaId, LocalDateTime inicio, LocalDateTime fim);
 
-    // 🎯 SOLUÇÃO DO SEU ERRO DE COMPILAÇÃO:
-    // Este é o método que o GanhosController está tentando chamar.
-    // O Spring Data JPA vai gerar a busca por ID automaticamente.
+    // Método solicitado pelo GanhosController para buscar vendas após o último pagamento
+    List<Venda> findByEmpresaIdAndVendedorIdAndDataHoraAfter(Long empresaId, Long vendedorId, LocalDateTime dataHora);
+
+    // Busca por intervalo específico entre duas datas
     List<Venda> findByEmpresaIdAndVendedorIdAndDataHoraBetween(Long empresaId, Long vendedorId, LocalDateTime inicio, LocalDateTime fim);
 
     // Sua query personalizada por nome (LOWERCASE)

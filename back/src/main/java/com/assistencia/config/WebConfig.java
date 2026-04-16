@@ -22,6 +22,8 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/**",      // Login e Registro
                         "/api/webhook/**",   // Mercado Pago (precisa receber o aviso de pagamento)
                         "/api/pagamento/**", // Geração do PIX para o cliente pagar
+                        "/api/admin/empresa/gerar-renovacao", // Novo endpoint de renovação
+                        "/api/pagamentos/assinatura/status-check", // Verificação da confirmação do PIX
                         "/error"             // Evita loop infinito em caso de erro interno
                 );
     }

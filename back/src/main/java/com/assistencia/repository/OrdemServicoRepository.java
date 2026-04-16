@@ -9,11 +9,14 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 @Repository
 public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long> {
 
-    // 🔥 RESOLVE O ERRO: Adicionado para o cálculo de comissões por técnico e data
-    List<OrdemServico> findByEmpresaIdAndStatusAndFuncionarioAndamentoAndDataEntregaAfter(
+    // 🔥 RESOLVE O ERRO: Adicionado IgnoreCase para bater com a chamada do GanhosController
+    List<OrdemServico> findByEmpresaIdAndStatusAndFuncionarioAndamentoIgnoreCaseAndDataEntregaAfter(
             Long empresaId,
             String status,
             String funcionarioAndamento,
@@ -22,6 +25,23 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
 
     // --- 🔐 SEGURANÇA SAAS: LISTAGEM POR LOJA ---
     List<OrdemServico> findByEmpresaIdOrderByIdDesc(Long empresaId);
+
+    Page<OrdemServico> findByEmpresaIdOrderByIdDesc(Long empresaId, Pageable pageable);
+
+    @Query("SELECT os FROM OrdemServico os WHERE os.empresa.id = :eid "
+            + "AND (:id IS NULL OR os.id = :id) "
+            + "AND (:nome IS NULL OR :nome = '' OR LOWER(os.clienteNome) LIKE LOWER(CONCAT('%', :nome, '%'))) "
+            + "AND (:status IS NULL OR :status = '' OR os.status = :status) "
+            + "AND (:d0 IS NULL OR os.data >= :d0) "
+            + "AND (:d1 IS NULL OR os.data < :d1)")
+    Page<OrdemServico> findByEmpresaFiltrado(
+            @Param("eid") Long empresaId,
+            @Param("id") Long id,
+            @Param("nome") String nome,
+            @Param("status") String status,
+            @Param("d0") LocalDateTime d0,
+            @Param("d1") LocalDateTime d1,
+            Pageable pageable);
 
     @Query("SELECT os FROM OrdemServico os WHERE os.empresa.id = :empresaId AND (" +
             "LOWER(CONCAT(os.id, '')) LIKE LOWER(CONCAT('%', :termo, '%')) OR " +

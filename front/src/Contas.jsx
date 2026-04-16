@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from './api';
+import { useFeedback } from './context/FeedbackContext';
 
 const Contas = ({ usuarioLogado }) => {
+    const { notify, confirmDialog } = useFeedback();
     const [contas, setContas] = useState([]);
     const [historico, setHistorico] = useState([]);
     const [resumo, setResumo] = useState({
@@ -51,7 +53,7 @@ const Contas = ({ usuarioLogado }) => {
             setFormData({ descricao: '', diaVencimento: '', valor: '', recorrente: false });
             carregarDados();
         } catch (err) {
-            alert("Erro ao lançar conta.");
+            notify.error('Erro ao lançar conta.', 'Contas');
         }
     };
 
@@ -60,20 +62,21 @@ const Contas = ({ usuarioLogado }) => {
             // Corrigido para bater no endpoint do novo Controller
             await api.post(`/api/contas/pagar/${id}`);
             carregarDados();
+            notify.success('Pagamento registrado.', 'Contas');
         } catch (err) {
-            alert("Erro ao processar pagamento.");
+            notify.error('Erro ao processar pagamento.', 'Contas');
         }
     };
 
     const handleDeletar = async (id) => {
-        if (window.confirm("Deseja apagar este lançamento?")) {
-            try {
-                // Verbo DELETE conforme o novo padrão REST do Java
-                await api.delete(`/api/contas/deletar/${id}`);
-                carregarDados();
-            } catch (err) {
-                alert("Erro ao deletar.");
-            }
+        const ok = await confirmDialog('Deseja apagar este lançamento?', 'Excluir');
+        if (!ok) return;
+        try {
+            await api.delete(`/api/contas/deletar/${id}`);
+            carregarDados();
+            notify.success('Lançamento removido.', 'Contas');
+        } catch (err) {
+            notify.error('Erro ao excluir.', 'Contas');
         }
     };
 
@@ -88,24 +91,6 @@ const Contas = ({ usuarioLogado }) => {
 
     return (
         <div className="mt-2 text-white">
-            <style>
-                {`
-                .shark-card { background: #1a1a1a; border-radius: 15px; border-left: 5px solid #333; transition: 0.3s; }
-                .shark-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.5); filter: brightness(1.1); }
-                .border-left-info { border-left-color: #0dcaf0 !important; }
-                .border-left-danger { border-left-color: #dc3545 !important; }
-                .border-left-success { border-left-color: #198754 !important; }
-                .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
-                .status-pago { color: #198754 !important; font-weight: 800; text-transform: uppercase; font-size: 0.7rem; }
-                .status-pendente { color: #0dcaf0 !important; font-weight: 800; text-transform: uppercase; font-size: 0.7rem; }
-                .status-vencida { color: #dc3545 !important; font-weight: 800; text-transform: uppercase; font-size: 0.7rem; animation: pulse-red 2s infinite; }
-                @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-                .btn-delete-ghost { color: #dc3545; background: transparent; border: none; transition: 0.2s; }
-                .btn-delete-ghost:hover { color: #ff4d5e; transform: scale(1.2); }
-                input::-webkit-calendar-picker-indicator { filter: invert(1); }
-                `}
-            </style>
-
             <div className="mb-4">
                 <h2 className="fw-bold mb-0">
                     <i className="bi bi-calendar-check glow-info me-2" style={{ color: '#0dcaf0' }}></i> CONTAS DE {mesAtual.toUpperCase()}
@@ -116,25 +101,25 @@ const Contas = ({ usuarioLogado }) => {
             {/* CARDS FINANCEIROS - AGORA USANDO res.data.resumo vindo do Java */}
             <div className="row g-3 mb-4">
                 <div className="col-md-3">
-                    <div className="card shark-card border-left-info px-4 py-3" style={{ background: 'rgba(13, 202, 240, 0.05)' }}>
+                    <div className="card shark-stat-card border-left-info px-4 py-3" style={{ background: 'rgba(13, 202, 240, 0.05)' }}>
                         <span className="text-info small fw-bold text-uppercase">Total Contas</span>
                         <h3 className="fw-bold">{formatarMoeda(resumo.totalMes)}</h3>
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card shark-card border-left-success px-4 py-3" style={{ background: 'rgba(25, 135, 84, 0.05)' }}>
+                    <div className="card shark-stat-card border-left-success px-4 py-3" style={{ background: 'rgba(25, 135, 84, 0.05)' }}>
                         <span className="text-success small fw-bold text-uppercase">Total Pago</span>
                         <h3 className="fw-bold">{formatarMoeda(resumo.totalPago)}</h3>
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card shark-card border-left-info px-4 py-3" style={{ borderLeftColor: '#ffc107', background: 'rgba(255, 193, 7, 0.05)' }}>
+                    <div className="card shark-stat-card border-left-info px-4 py-3" style={{ borderLeftColor: '#ffc107', background: 'rgba(255, 193, 7, 0.05)' }}>
                         <span className="small fw-bold text-uppercase" style={{ color: '#ffc107' }}>Total Pendente</span>
                         <h3 className="fw-bold">{formatarMoeda(resumo.totalPendente)}</h3>
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card shark-card border-left-danger px-4 py-3" style={{ background: resumo.totalVencido > 0 ? 'rgba(220, 53, 69, 0.2)' : 'rgba(220, 53, 69, 0.05)' }}>
+                    <div className="card shark-stat-card border-left-danger px-4 py-3" style={{ background: resumo.totalVencido > 0 ? 'rgba(220, 53, 69, 0.2)' : 'rgba(220, 53, 69, 0.05)' }}>
                         <span className="text-danger small fw-bold text-uppercase">Total Vencido</span>
                         <h3 className="fw-bold">{formatarMoeda(resumo.totalVencido)}</h3>
                     </div>
@@ -142,7 +127,7 @@ const Contas = ({ usuarioLogado }) => {
             </div>
 
             {/* FORMULÁRIO DE LANÇAMENTO */}
-            <div className="card shark-card border-left-info shadow-lg mb-5" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+            <div className="card shark-stat-card border-left-info shadow-lg mb-5" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
                 <div className="card-body p-4">
                     <p className="small text-info mb-3"><i className="bi bi-info-circle-fill me-1"></i> Lançamento rápido: Informe o dia, o sistema cuidará do mês e ano atuais.</p>
                     <form onSubmit={handleSalvar} className="row g-3 align-items-end">

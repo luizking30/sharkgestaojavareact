@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import './shark-layout.css';
 
 const Layout = ({ children, usuarioLogado }) => {
   const location = useLocation();
@@ -8,14 +9,6 @@ const Layout = ({ children, usuarioLogado }) => {
 
   useEffect(() => {
     setIsMenuOpen(false);
-
-    const cleanupModals = () => {
-      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-      document.body.classList.remove('modal-open');
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-    };
-    cleanupModals();
   }, [location]);
 
   const handleLogout = (e) => {
@@ -30,89 +23,6 @@ const Layout = ({ children, usuarioLogado }) => {
 
   return (
       <div className="layout-wrapper">
-        <style>
-          {`
-          :root {
-            --shark-blue: #0047ab;
-            --shark-light-blue: #00d4ff;
-            --shark-black: #020617;
-            --shark-card-bg: #1e293b;
-            --shark-white: #f8fafc;
-            --nav-hover: rgba(0, 212, 255, 0.1);
-          }
-          body {
-            background-color: #0f172a;
-            color: var(--shark-white);
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            min-height: 100vh;
-          }
-          .navbar { 
-            background-color: var(--shark-black) !important; 
-            border-bottom: 2px solid var(--shark-blue); 
-            padding: 0.5rem 1.5rem; 
-          }
-          .nav-link { 
-            color: #94a3b8 !important; 
-            border-radius: 10px; 
-            transition: 0.3s; 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-            margin: 0 5px; 
-            font-weight: 500; 
-          }
-          .nav-link:hover, .nav-link.active { 
-            background-color: var(--nav-hover); 
-            color: var(--shark-light-blue) !important; 
-          }
-          .lock-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(2, 6, 23, 0.98); backdrop-filter: blur(15px);
-            z-index: 9999; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; text-align: center;
-          }
-          main.container {
-            background: rgba(30, 41, 59, 0.2);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            margin-top: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            min-height: 80vh;
-          }
-          .btn-logout:hover { color: #ff4444 !important; transform: scale(1.1); }
-
-          /* 🦈 AJUSTADO: Alinhamento à esquerda */
-          .profile-info-container {
-            display: flex;
-            flex-direction: column;
-            text-align: left; 
-            border-left: 1px solid rgba(255, 255, 255, 0.1);
-            padding-left: 15px;
-            line-height: 1.2;
-          }
-          .info-row {
-            display: flex;
-            justify-content: flex-start;
-            gap: 5px;
-            font-size: 0.7rem;
-          }
-          .info-label {
-            color: #64748b;
-            font-weight: 800;
-            text-transform: uppercase;
-          }
-          .info-value {
-            font-weight: 600;
-          }
-          .value-empresa { color: var(--shark-light-blue); }
-          .value-cargo { color: #fbbf24; }
-          .value-nome { color: #fff; font-size: 0.8rem; }
-        `}
-        </style>
-
         {isBloqueado && !isPaginaPagamento && (
             <div className="lock-screen">
               <img src="/images/logo_layout.png" alt="Shark" style={{ width: '180px', marginBottom: '20px', filter: 'grayscale(1) opacity(0.5)' }} />
@@ -145,19 +55,19 @@ const Layout = ({ children, usuarioLogado }) => {
                       <li className="nav-item"><Link className={`nav-link ${location.pathname === '/servicos' ? 'active' : ''}`} to="/servicos"><i className="bi bi-tools"></i> O.S.</Link></li>
                       <li className="nav-item"><Link className={`nav-link ${location.pathname === '/vendas' ? 'active' : ''}`} to="/vendas"><i className="bi bi-cart-check"></i> Vendas</Link></li>
                       <li className="nav-item"><Link className={`nav-link ${location.pathname === '/contas' ? 'active' : ''}`} to="/contas"><i className="bi bi-cash-stack"></i> Contas</Link></li>
-                      <li className="nav-item"><Link className={`nav-link ${location.pathname === '/meu-painel' ? 'active' : ''}`} to="/meu-painel"><i className="bi bi-wallet2"></i> Ganhos</Link></li>
+                      <li className="nav-item"><Link className={`nav-link ${location.pathname === '/meu-painel' ? 'active' : ''}`} to="/meu-painel"><i className="bi bi-person-badge"></i> Meu painel</Link></li>
 
                       {(usuarioLogado?.role === 'ROLE_ADMIN' || usuarioLogado?.role === 'ROLE_OWNER') && (
                           <li className="nav-item">
-                            <Link className={`nav-link ${location.pathname === '/admin/empresa' ? 'active' : ''}`} to="/admin/empresa" style={{ color: 'var(--shark-light-blue)' }}>
-                              <i className="bi bi-shield-lock-fill"></i> Empresa
+                            <Link className={`nav-link text-info ${location.pathname === '/admin/empresa' ? 'active' : ''}`} to="/admin/empresa">
+                              <i className="bi bi-shield-lock-fill"></i> Painel empresa
                             </Link>
                           </li>
                       )}
 
                       {usuarioLogado?.role === 'ROLE_OWNER' && (
                           <li className="nav-item">
-                            <Link className={`nav-link ${location.pathname === '/super-admin' ? 'active' : ''}`} to="/super-admin" style={{ color: '#fbbf24' }}>
+                            <Link className={`nav-link nav-link--accent-owner ${location.pathname === '/super-admin' ? 'active' : ''}`} to="/super-admin">
                               <i className="bi bi-crown-fill"></i> ADM GERAL
                             </Link>
                           </li>

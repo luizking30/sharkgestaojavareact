@@ -5,10 +5,15 @@ import com.assistencia.model.Usuario;
 import com.assistencia.repository.ProdutoRepository;
 import com.assistencia.util.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -27,12 +32,28 @@ public class EstoqueController {
 
     // 1. Listar (Retorna JSON filtrado por Empresa)
     @GetMapping
-    public ResponseEntity<List<Produto>> listar() {
+    public ResponseEntity<Page<Produto>> listar(@PageableDefault(size = 20, sort = "nome") Pageable pageable) {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
-        List<Produto> produtos = repo.findByEmpresaId(logado.getEmpresa().getId());
-        return ResponseEntity.ok(produtos);
+        return ResponseEntity.ok(repo.findByEmpresaId(logado.getEmpresa().getId(), pageable));
+    }
+
+    /** Totais de investimento / faturamento previsto (toda a empresa, independente da página da listagem). */
+    @GetMapping("/resumo-financeiro")
+    public ResponseEntity<Map<String, Double>> resumoFinanceiro() {
+        Usuario logado = securityUtils.getUsuarioLogado();
+        if (logado == null) return ResponseEntity.status(401).build();
+
+        Object[] row = repo.somarInvestidoEFaturamento(logado.getEmpresa().getId());
+        double investido = row != null && row[0] != null ? ((Number) row[0]).doubleValue() : 0.0;
+        double faturamento = row != null && row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+
+        Map<String, Double> m = new HashMap<>();
+        m.put("investido", investido);
+        m.put("faturamento", faturamento);
+        m.put("lucro", faturamento - investido);
+        return ResponseEntity.ok(m);
     }
 
     // 2. Buscar por ID

@@ -14,3 +14,7 @@ front/dist/
 # Logs e arquivos temporários
 *.log
 .DS_Store
+
+# Variaveis de ambiente locais
+**/.env
+!**/.env.example

@@ -17,6 +17,9 @@ public class Empresa {
     @Column(unique = true)
     private String cnpj;
 
+    @Column(length = 20)
+    private String whatsapp;
+
     private boolean ativo = true;
 
     // 🔥 NOVO CAMPO: Define quantos dias de uso a empresa ainda tem
@@ -34,6 +37,9 @@ public class Empresa {
 
     public String getCnpj() { return cnpj; }
     public void setCnpj(String cnpj) { this.cnpj = cnpj; }
+
+    public String getWhatsapp() { return whatsapp; }
+    public void setWhatsapp(String whatsapp) { this.whatsapp = whatsapp; }
 
     public boolean isAtivo() { return ativo; }
     public void setAtivo(boolean ativo) { this.ativo = ativo; }

@@ -9,7 +9,7 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 
 // --- 2. ESTILOS PERSONALIZADOS ---
-// Importante vir DEPOIS do bootstrap para você poder customizar as cores da Shark
+import './App.css'
 import './Login.css'
 
 import App from './App.jsx'

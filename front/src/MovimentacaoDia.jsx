@@ -16,6 +16,7 @@ const MovimentacaoDia = () => {
             return res.data;
         },
         refetchOnWindowFocus: true,
+        staleTime: 15_000,
         retry: 1
     });
 
@@ -52,7 +53,7 @@ const MovimentacaoDia = () => {
     // Estado de carregamento
     if (isLoading) {
         return (
-            <div className="d-flex justify-content-center align-items-center" style={{height: '400px'}}>
+            <div className="d-flex justify-content-center align-items-center dashboard-loading-wrap">
                 <div className="text-center">
                     <div className="spinner-border text-info mb-2" role="status"></div>
                     <p className="text-info fw-bold">Sincronizando Shark Eletrônicos...</p>
@@ -73,26 +74,6 @@ const MovimentacaoDia = () => {
 
     return (
         <div className="mt-2 text-white">
-            <style>
-                {`
-                    .shark-card { background: #1a1a1a; border-radius: 15px; border: none; border-left: 5px solid #333; transition: all 0.3s ease; }
-                    .shark-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.5); filter: brightness(1.2); }
-                    .border-left-primary { border-left-color: #0d6efd !important; }
-                    .border-left-success { border-left-color: #198754 !important; }
-                    .border-left-danger { border-left-color: #dc3545 !important; }
-                    .border-left-info { border-left-color: #0dcaf0 !important; }
-                    .border-left-warning { border-left-color: #ffc107 !important; }
-                    .border-left-total { border-left: 8px solid #06f906 !important; }
-                    .glow-success { filter: drop-shadow(0 0 5px #198754); }
-                    .glow-danger { filter: drop-shadow(0 0 5px #dc3545); }
-                    .glow-info { filter: drop-shadow(0 0 5px #0dcaf0); }
-                    .glow-warning { filter: drop-shadow(0 0 5px #ffc107); }
-                    .rocket-animate { display: inline-block; animation: float 2s ease-in-out infinite; }
-                    @keyframes float { 0% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-10px) rotate(5deg); } 100% { transform: translateY(0px) rotate(0deg); } }
-                    .icon-large-side { font-size: 3.5rem; opacity: 0.8; }
-                `}
-            </style>
-
             <div className="d-flex align-items-center justify-content-between mb-4">
                 <h2 className="mb-0 text-white fw-bold">
                     <i className="bi bi-speedometer2 text-white glow-success me-2"></i> MOVIMENTAÇÃO DO DIA
@@ -104,28 +85,28 @@ const MovimentacaoDia = () => {
 
             <div className="row g-4 mb-4">
                 <div className="col-md-3">
-                    <div className="card p-4 text-center h-100 shark-card border-left-primary">
+                    <div className="card p-4 text-center h-100 shark-stat-card border-left-primary">
                         <div className="mb-2"><i className="bi bi-people-fill text-primary fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">Clientes Novos</h6>
                         <h2 className="text-primary mb-0 fw-bold">{clientesHoje}</h2>
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card p-4 text-center h-100 shark-card border-left-info">
+                    <div className="card p-4 text-center h-100 shark-stat-card border-left-info">
                         <div className="mb-2"><i className="bi bi-file-earmark-medical text-info fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">OS Criadas</h6>
                         <h2 className="text-info mb-0 fw-bold">{osCriadasHoje}</h2>
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card p-4 text-center h-100 shark-card border-left-success">
+                    <div className="card p-4 text-center h-100 shark-stat-card border-left-success">
                         <div className="mb-2"><i className="bi bi-cart-check-fill text-success fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">Vendas Feitas</h6>
                         <h2 className="text-success mb-0 fw-bold">{vendasHoje}</h2>
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card p-4 text-center h-100 shark-card border-left-warning">
+                    <div className="card p-4 text-center h-100 shark-stat-card border-left-warning">
                         <div className="mb-2"><i className="bi bi-box-seam-fill text-warning fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">OS Entregues</h6>
                         <h2 className="text-warning mb-0 fw-bold">{osEntreguesHoje}</h2>
@@ -137,7 +118,7 @@ const MovimentacaoDia = () => {
             <h5 className="text-white small fw-bold mb-3 text-uppercase"><i className="bi bi-bag-check me-2"></i>Vendas de hoje</h5>
             <div className="row g-4 mb-5">
                 <div className="col-md-4">
-                    <div className="card p-4 h-100 shark-card border-left-success">
+                    <div className="card p-4 h-100 shark-stat-card border-left-success">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 className="text-success small fw-bold text-uppercase mb-2">Venda Bruta</h6>
@@ -148,7 +129,7 @@ const MovimentacaoDia = () => {
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card p-4 h-100 shark-card border-left-danger">
+                    <div className="card p-4 h-100 shark-stat-card border-left-danger">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 className="text-danger small fw-bold text-uppercase mb-2">Custo Estoque</h6>
@@ -159,7 +140,7 @@ const MovimentacaoDia = () => {
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card p-4 h-100 shark-card border-left-info" style={{background: 'linear-gradient(45deg, #0b222e, #1a1a1a)'}}>
+                    <div className="card p-4 h-100 shark-stat-card border-left-info shark-stat-card--gradient">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 className="text-info small fw-bold text-uppercase mb-2">Venda Líquida</h6>
@@ -178,7 +159,7 @@ const MovimentacaoDia = () => {
             <h5 className="text-white small fw-bold mb-3 text-uppercase"><i className="bi bi-tools me-2"></i>Serviços entregues hoje</h5>
             <div className="row g-4 mb-5">
                 <div className="col-md-4">
-                    <div className="card p-4 h-100 shark-card border-left-success">
+                    <div className="card p-4 h-100 shark-stat-card border-left-success">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 className="text-success small fw-bold text-uppercase mb-2">OS Bruto</h6>
@@ -189,7 +170,7 @@ const MovimentacaoDia = () => {
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card p-4 h-100 shark-card border-left-danger">
+                    <div className="card p-4 h-100 shark-stat-card border-left-danger">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 className="text-danger small fw-bold text-uppercase mb-2">Gasto Peças</h6>
@@ -200,7 +181,7 @@ const MovimentacaoDia = () => {
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card p-4 h-100 shark-card border-left-info" style={{background: 'linear-gradient(45deg, #0b222e, #1a1a1a)'}}>
+                    <div className="card p-4 h-100 shark-stat-card border-left-info shark-stat-card--gradient">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 className="text-info small fw-bold text-uppercase mb-2">Serviço Líquido</h6>
@@ -218,16 +199,16 @@ const MovimentacaoDia = () => {
             {/* TOTAL FINAL */}
             <div className="row g-4">
                 <div className="col-12">
-                    <div className="card p-4 shadow-lg shark-card border-left-total" style={{background: 'linear-gradient(90deg, #000, #111)'}}>
+                    <div className="card p-4 shadow-lg shark-stat-card border-left-total shark-stat-card--gradient-row">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 className="text-success fw-bold text-uppercase mb-1">
-                                    <span className="rocket-animate" style={{fontSize: '2.5rem'}}>🚀</span> Lucro Líquido Total
+                                    <span className="rocket-animate shark-rocket-emoji">🚀</span> Lucro Líquido Total
                                 </h5>
                                 <p className="text-white-50 small mb-0">(Vendas + Serviços)</p>
                             </div>
                             <div className="text-end">
-                                <h1 className="text-white mb-0 fw-bold" style={{fontSize: '3.5rem'}}>
+                                <h1 className="text-white mb-0 fw-bold shark-dash-total-valor">
                                     R$ {formatCurrency(lucroTotalHoje)}
                                 </h1>
                             </div>

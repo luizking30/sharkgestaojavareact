@@ -12,6 +12,10 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.kernel.geom.PageSize;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,14 +43,35 @@ public class VendasController {
         this.produtoRepo = produtoRepo;
     }
 
-    // 1. Listar Vendas da Empresa
+    // 1. Listar Vendas da Empresa (paginado; filtros opcionais: id, vendedor = trecho do nome, data = yyyy-MM-dd)
     @GetMapping
-    public ResponseEntity<List<Venda>> listarVendas() {
+    public ResponseEntity<Page<Venda>> listarVendas(
+            @RequestParam(required = false) Long id,
+            @RequestParam(required = false) String vendedor,
+            @RequestParam(required = false) String data,
+            @PageableDefault(size = 15, sort = "dataHora", direction = Sort.Direction.DESC) Pageable pageable) {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
-        List<Venda> vendas = vendaRepo.findByEmpresaIdOrderByDataHoraDesc(logado.getEmpresa().getId());
-        return ResponseEntity.ok(vendas);
+        Long empresaId = logado.getEmpresa().getId();
+
+        LocalDateTime d0 = null;
+        LocalDateTime d1 = null;
+        if (data != null && !data.isBlank()) {
+            LocalDate dia = LocalDate.parse(data);
+            d0 = dia.atStartOfDay();
+            d1 = dia.plusDays(1).atStartOfDay();
+        }
+
+        Long idFiltro = id;
+        String vendF = (vendedor != null && !vendedor.isBlank()) ? vendedor : null;
+
+        boolean temFiltro = idFiltro != null || vendF != null || d0 != null;
+        if (!temFiltro) {
+            return ResponseEntity.ok(vendaRepo.findByEmpresaIdOrderByDataHoraDesc(empresaId, pageable));
+        }
+
+        return ResponseEntity.ok(vendaRepo.findByEmpresaFiltrado(empresaId, idFiltro, vendF, d0, d1, pageable));
     }
 
     // 2. Filtro dinâmico (Ajustado para o novo método do Repository)

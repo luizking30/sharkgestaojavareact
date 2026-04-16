@@ -87,8 +87,9 @@ public class AdminController {
                 return ResponseEntity.status(403).body("Acesso negado.");
             }
 
-            if ("PROPRIETARIO".equalsIgnoreCase(u.getTipoFuncionario())) {
-                return ResponseEntity.badRequest().body("Não é possível excluir o proprietário da unidade.");
+            // 🛡️ TRAVA SHARK: Impede a exclusão do usuário raiz (Dono Principal)
+            if (u.isRoot()) {
+                return ResponseEntity.status(403).body("🚨 Operação negada: O Administrador Principal da unidade não pode ser removido.");
             }
 
             try {
@@ -100,18 +101,38 @@ public class AdminController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/empresa/atualizar-cnpj")
-    public ResponseEntity<?> atualizarCnpj(@RequestBody Map<String, String> payload) {
+    @PostMapping("/empresa/atualizar-informacoes")
+    public ResponseEntity<?> atualizarInformacoesEmpresa(@RequestBody Map<String, String> payload) {
         Usuario admin = securityUtils.getUsuarioLogado();
         if (admin == null) return ResponseEntity.status(403).build();
 
-        String cnpj = payload.get("cnpj");
-        if (cnpj == null || cnpj.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("CNPJ é obrigatório.");
+        String nome = payload.get("nome");
+        if (nome == null || nome.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Nome da empresa é obrigatório.");
         }
 
         Empresa empresa = admin.getEmpresa();
-        empresa.setCnpj(cnpj.replaceAll("\\D", ""));
+        String cnpj = payload.get("cnpj");
+        String cnpjLimpo = (cnpj != null && !cnpj.trim().isEmpty()) ? cnpj.replaceAll("\\D", "") : null;
+        if (cnpjLimpo != null && !cnpjLimpo.isEmpty() && cnpjLimpo.length() != 14) {
+            return ResponseEntity.badRequest().body("CNPJ incompleto. Informe os 14 dígitos.");
+        }
+        if (cnpjLimpo != null && !cnpjLimpo.isEmpty()) {
+            Optional<Empresa> existente = empresaRepo.findByCnpj(cnpjLimpo);
+            if (existente.isPresent() && !existente.get().getId().equals(empresa.getId())) {
+                return ResponseEntity.badRequest().body("Este CNPJ já está cadastrado em outra empresa.");
+            }
+        }
+
+        String whatsapp = payload.get("whatsapp");
+        String whatsappLimpo = (whatsapp != null && !whatsapp.trim().isEmpty()) ? whatsapp.replaceAll("\\D", "") : null;
+        if (whatsappLimpo == null || whatsappLimpo.length() < 11) {
+            return ResponseEntity.badRequest().body("WhatsApp incompleto. Informe DDD + número (11 dígitos).");
+        }
+
+        empresa.setNome(nome.trim());
+        empresa.setCnpj(cnpjLimpo);
+        empresa.setWhatsapp(whatsappLimpo);
         empresaRepo.save(empresa);
 
         return ResponseEntity.ok().build();
@@ -163,8 +184,49 @@ public class AdminController {
         return usuarioRepo.findById(id).map(u -> {
             if (u.getEmpresa().getId().equals(admin.getEmpresa().getId())) {
                 try {
+                    String roleAdmin = (admin.getRole() == null) ? "" : admin.getRole().trim().toUpperCase();
+                    boolean adminIsOwner = roleAdmin.contains("OWNER");
+
+                    // 🛡️ Ninguém altera a Role de um usuário ROOT, a menos que seja o próprio OWNER do sistema
+                    if (u.isRoot() && !adminIsOwner) {
+                        return ResponseEntity.status(403).body("Privilégios do Administrador Raiz são protegidos.");
+                    }
+
                     if (payload.get("tipoFuncionario") != null) {
-                        u.setTipoFuncionario(payload.get("tipoFuncionario").toString());
+                        String novoTipo = payload.get("tipoFuncionario").toString().trim().toUpperCase();
+                        String roleAtual = (u.getRole() == null) ? "" : u.getRole().trim().toUpperCase();
+                        boolean rebaixandoCargo = !"PROPRIETARIO".equals(novoTipo);
+                        boolean isOwner = roleAtual.contains("OWNER");
+                        boolean isAdmin = "ROLE_ADMIN".equals(roleAtual) || "ADMIN".equals(roleAtual);
+
+                        // Trava absoluta: root nunca sai do cargo PROPRIETARIO.
+                        if (u.isRoot() && rebaixandoCargo) {
+                            return ResponseEntity.status(403).body("Perfil root é protegido e não pode ser rebaixado.");
+                        }
+
+                        // Regra 1: OWNER nunca pode ser rebaixado de cargo.
+                        if (isOwner && rebaixandoCargo) {
+                            return ResponseEntity.status(403).body("Usuário OWNER não pode ser rebaixado para outro cargo.");
+                        }
+
+                        // Regra 2: ADMIN com root=true também não pode ser rebaixado.
+                        if (isAdmin && u.isRoot() && rebaixandoCargo) {
+                            return ResponseEntity.status(403).body("Administrador principal (root) não pode ser rebaixado.");
+                        }
+
+                        // Aplica novo tipo e role conforme regra.
+                        u.setTipoFuncionario(novoTipo);
+                        if ("PROPRIETARIO".equals(novoTipo)) {
+                            // Promove para admin da unidade sem sobrescrever OWNER.
+                            if (!isOwner) {
+                                u.setRole("ROLE_ADMIN");
+                            }
+                        } else {
+                            // ADMIN root=false pode ser rebaixado para funcionário.
+                            if (!isOwner && !u.isRoot()) {
+                                u.setRole("ROLE_FUNCIONARIO");
+                            }
+                        }
                     }
 
                     if (payload.get("comissaoOs") != null) {
@@ -192,10 +254,16 @@ public class AdminController {
 
         return usuarioRepo.findById(id).map(u -> {
             if (u.getEmpresa().getId().equals(admin.getEmpresa().getId())) {
+                String roleAtual = (u.getRole() == null) ? "" : u.getRole().trim().toUpperCase();
+                boolean isOwner = roleAtual.contains("OWNER");
+                boolean isAdmin = "ROLE_ADMIN".equals(roleAtual) || "ADMIN".equals(roleAtual);
+                if (isOwner || (isAdmin && u.isRoot())) {
+                    return ResponseEntity.status(403).body("Este perfil administrativo protegido não pode ter cargo alterado por aprovação.");
+                }
                 u.setAprovado(true);
+                u.setRole("ROLE_FUNCIONARIO");
                 usuarioRepo.save(u);
 
-                // 📧 DISPARO DE E-MAIL DE APROVAÇÃO (Shark Gestão)
                 emailService.enviarEmailAprovacaoFuncionario(
                         u.getEmail(),
                         u.getNome(),

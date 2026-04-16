@@ -67,26 +67,8 @@ const PagamentoPix = () => {
 
     return (
         <div className="row justify-content-center animate__animated animate__fadeIn">
-            <style>
-                {`
-                .pix-input {
-                    background: #000 !important;
-                    color: #0dcaf0 !important;
-                    border: 1px solid #334155 !important;
-                    font-family: 'JetBrains Mono', monospace;
-                }
-                .qr-bg {
-                    background: white;
-                    padding: 15px;
-                    display: inline-block;
-                    border-radius: 15px;
-                    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-                }
-                `}
-            </style>
-
             <div className="col-md-6">
-                <div className="card bg-dark border-primary shadow-lg" style={{ borderRadius: '20px' }}>
+                <div className="card bg-dark border-primary shadow-lg rounded-4">
                     <div className="card-body p-5 text-center">
 
                         {!pago ? (
@@ -97,7 +79,7 @@ const PagamentoPix = () => {
                                 <p className="text-white-50">Escaneie o código abaixo com o aplicativo do seu banco:</p>
 
                                 {qrCodeBase64 && (
-                                    <div className="qr-bg mb-4">
+                                    <div className="pix-qr-wrap mb-4">
                                         <img 
                                             src={`data:image/png;base64,${qrCodeBase64}`} 
                                             alt="QR Code Pix" 
@@ -111,7 +93,7 @@ const PagamentoPix = () => {
                                     <div className="input-group">
                                         <input 
                                             type="text" 
-                                            className="form-control pix-input small" 
+                                            className="form-control pix-copia-input small" 
                                             value={copiaECola} 
                                             readOnly 
                                         />

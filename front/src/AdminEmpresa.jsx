@@ -1,17 +1,84 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal, flushSync } from 'react-dom';
+import { Modal } from 'bootstrap';
 import api from './api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useFeedback } from './context/FeedbackContext';
+
+/** Vite não expõe `window.bootstrap` pelo import do bundle; usar API ESM do pacote. */
+const showBsModal = (el) => {
+    if (!el) return;
+    Modal.getOrCreateInstance(el).show();
+};
+
+const hideBsModal = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    Modal.getOrCreateInstance(el).hide();
+};
+
+const getApiErrorMessage = (err, fallback) => {
+    const data = err?.response?.data;
+    if (!data) return fallback;
+    if (typeof data === 'string') return data;
+    if (typeof data?.message === 'string') return data.message;
+    if (typeof data?.error === 'string') return data.error;
+    if (typeof data === 'object') {
+        const values = Object.values(data).filter((v) => typeof v === 'string' && v.trim());
+        if (values.length) return values.join(' | ');
+    }
+    return fallback;
+};
+
+const formatCnpj = (value) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 14);
+    if (!digits) return '---';
+    return digits
+        .replace(/^(\d{2})(\d)/, '$1.$2')
+        .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+        .replace(/\.(\d{3})(\d)/, '.$1/$2')
+        .replace(/(\d{4})(\d)/, '$1-$2');
+};
+
+const formatWhatsapp = (value) => {
+    const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
+    if (!digits) return '---';
+    if (digits.length > 10) {
+        return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    }
+    if (digits.length > 6) {
+        return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+    if (digits.length > 2) {
+        return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    }
+    return digits;
+};
 
 const AdminEmpresa = ({ usuarioLogado }) => {
     const queryClient = useQueryClient();
+    const { notify, confirmDialog } = useFeedback();
 
-    // Estados locais para controle de UI e Modais
+    // --- ESTADOS COM TIPAGEM INICIAL CORRETA ---
     const [statusAssinatura, setStatusAssinatura] = useState({ qr_code: '', qr_code_base64: '', dias_anteriores: 0 });
-    const [viewMP, setViewMP] = useState('selection'); // 'selection' ou 'qr'
-    const [modalData, setModalData] = useState({ id: '', nome: '', tipo: '', comOs: 0, comVenda: 0, liqOs: 0, liqVenda: 0 });
+    const [viewMP, setViewMP] = useState('selection');
+    const [modalData, setModalData] = useState({
+        id: 0,
+        nome: '',
+        tipo: '',
+        tipoOriginal: '',
+        role: '',
+        isRoot: false,
+        comOs: 0,
+        comVenda: 0,
+        liqOs: 0,
+        liqVenda: 0
+    });
+    const [nomeEmpresaInput, setNomeEmpresaInput] = useState('');
     const [cnpjInput, setCnpjInput] = useState('');
+    const [whatsappEmpresaInput, setWhatsappEmpresaInput] = useState('');
 
-    // 1. BUSCA DE DADOS GERAIS
+    // --- 1. BUSCA DE DADOS (TIPAGEM SEGURA) ---
     const { data: adminData, isLoading } = useQuery({
         queryKey: ['admin-dados'],
         queryFn: async () => {
@@ -20,83 +87,175 @@ const AdminEmpresa = ({ usuarioLogado }) => {
         }
     });
 
-    const usuarios = adminData?.usuarios || [];
-    const pagamentos = adminData?.pagamentos || [];
-    const empresa = adminData?.empresa || {};
+    // Resolvendo os "Unresolved variables" via useMemo
+    const usuarios = useMemo(() => adminData?.usuarios || [], [adminData]);
+    const pagamentos = useMemo(() => adminData?.pagamentos || [], [adminData]);
+    const empresa = useMemo(() => adminData?.empresa || {}, [adminData]);
 
     useEffect(() => {
-        if (empresa.cnpj) setCnpjInput(empresa.cnpj);
-    }, [empresa.cnpj]);
+        setNomeEmpresaInput(empresa?.nome || '');
+        setCnpjInput(empresa?.cnpj || '');
+        setWhatsappEmpresaInput(empresa?.whatsapp || '');
+    }, [empresa?.nome, empresa?.cnpj, empresa?.whatsapp]);
 
-    // --- FUNÇÃO PARA LIMPAR TRAVAMENTOS DE MODAL ---
+    // --- UTILITÁRIOS ---
     const forceCloseModals = () => {
         const backdrops = document.querySelectorAll('.modal-backdrop');
         backdrops.forEach(b => b.remove());
         document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
         document.body.style.paddingRight = '';
+        const openModals = document.querySelectorAll('.modal.show');
+        openModals.forEach(m => {
+            m.classList.remove('show');
+            (m).style.display = 'none';
+        });
     };
 
-    // 2. MUTAÇÕES
+    const formatarMoeda = (v) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const abrirModalComissao = (u) => {
+        const liqOs = Number(u.totalComissaoOsAcumulada) || 0;
+        const liqVenda = Number(u.saldoVendaCalculado) || 0;
+        flushSync(() => {
+            setModalData({
+                id: Number(u.id),
+                nome: u.nome || '',
+                tipo: u.tipoFuncionario || '',
+                tipoOriginal: u.tipoFuncionario || '',
+                role: String(u.role || ''),
+                isRoot: Boolean(u.isRoot),
+                comOs: Number(u.comissaoOs) || 0,
+                comVenda: Number(u.comissaoVenda) || 0,
+                liqOs,
+                liqVenda
+            });
+        });
+        showBsModal(document.getElementById('modalComissao'));
+    };
+
+    const abrirModalRenovar = () => {
+        flushSync(() => setViewMP('selection'));
+        requestAnimationFrame(() => showBsModal(document.getElementById('modalRenovar')));
+    };
+
+    const abrirModalInfo = () => {
+        requestAnimationFrame(() => showBsModal(document.getElementById('modalCnpj')));
+    };
+
+    const handleCnpjChange = (e) => {
+        const raw = e.target.value.replace(/\D/g, '').substring(0, 14);
+        let v = raw;
+        if (raw.length > 2) v = raw.replace(/^(\d{2})(\d)/, '$1.$2');
+        if (raw.length > 5) v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+        if (raw.length > 8) v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+        if (raw.length > 12) v = v.replace(/(\d{4})(\d)/, '$1-$2');
+        setCnpjInput(v);
+    };
+    const handleEmpresaWhatsappChange = (e) => {
+        const raw = e.target.value.replace(/\D/g, '').substring(0, 11);
+        let v = raw;
+        if (v.length > 2) v = `(${v.substring(0, 2)}) ${v.substring(2)}`;
+        if (raw.length > 10) {
+            v = `(${raw.substring(0, 2)}) ${raw.substring(2, 7)}-${raw.substring(7)}`;
+        } else if (raw.length > 6) {
+            v = `(${raw.substring(0, 2)}) ${raw.substring(2, 6)}-${raw.substring(6)}`;
+        }
+        setWhatsappEmpresaInput(v);
+    };
+
+    // --- 2. MUTAÇÕES (CORREÇÃO DE PROMISES E TYPES) ---
     const aprovarMutation = useMutation({
         mutationFn: (id) => api.post(`/api/admin/funcionarios/aprovar/${id}`),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+            notify.success('Colaborador aprovado!', 'Sucesso');
         },
-        onError: () => alert("Erro ao aprovar colaborador.")
+        onError: () => notify.error('Erro ao aprovar.', 'Erro')
     });
 
     const pagarMutation = useMutation({
         mutationFn: (payload) => api.post('/api/pagamentos/registrar', payload),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
-            alert("Pagamento registrado com sucesso!");
-        }
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+            notify.success('Pagamento registrado!', 'Sucesso');
+        },
+        onError: (err) => notify.error(getApiErrorMessage(err, 'Erro no pagamento.'), 'Erro')
     });
 
     const configMutation = useMutation({
-        mutationFn: (data) => api.put(`/api/admin/funcionarios/configurar/${data.id}`, {
-            tipoFuncionario: data.payload.tipoFuncionario,
-            comissaoOs: parseFloat(data.payload.comissaoOs || 0),
-            comissaoVenda: parseFloat(data.payload.comissaoVenda || 0)
-        }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
-            alert("Configurações atualizadas!");
-            document.querySelector('#modalComissao [data-bs-dismiss="modal"]')?.click();
+        mutationFn: (data) => api.put(`/api/admin/funcionarios/configurar/${data.id}`, data.payload),
+        onSuccess: async (_data, variables) => {
+            const { id, payload } = variables;
+            const tipo = String(payload?.tipoFuncionario ?? '').trim().toUpperCase();
+            const roleLogadoNorm = String(usuarioLogado?.role || '').trim().toUpperCase();
+            const logadoIsOwner = roleLogadoNorm.includes('OWNER');
+            const alvoAntes = usuarios.find((u) => Number(u.id) === Number(id));
+            const roleAnterior = String(alvoAntes?.role ?? '').toUpperCase();
+            const eraAdminNaoRoot = roleAnterior === 'ROLE_ADMIN' && !alvoAntes?.isRoot;
+            const foiRebaixadoParaFuncionario = eraAdminNaoRoot && tipo !== '' && !tipo.startsWith('PROPRIETARIO');
+            const selfId =
+                usuarioLogado?.id != null
+                    ? Number(usuarioLogado.id) === Number(id)
+                    : usuarioLogado?.username &&
+                      usuarios.some((u) => Number(u.id) === Number(id) && u.username === usuarioLogado.username);
+            /* Spring recarrega a role no banco a cada request; se você deixa de ser PROPRIETARIO, o próximo GET /api/admin retorna 403 e o axios desloga. ROLE_OWNER continua com acesso (backend não remove). */
+            const perdeuAcessoPainelEmpresa =
+                selfId &&
+                tipo !== '' &&
+                !tipo.startsWith('PROPRIETARIO') &&
+                !logadoIsOwner;
+
+            if (perdeuAcessoPainelEmpresa) {
+                try {
+                    const raw = localStorage.getItem('usuarioShark');
+                    if (raw) {
+                        const u = JSON.parse(raw);
+                        u.tipoFuncionario = payload.tipoFuncionario;
+                        u.role = 'ROLE_FUNCIONARIO';
+                        localStorage.setItem('usuarioShark', JSON.stringify(u));
+                    }
+                } catch {
+                    /* ignore */
+                }
+                queryClient.removeQueries({ queryKey: ['admin-dados'] });
+                notify.success('Perfil atualizado. Redirecionando para o seu painel…', 'Sucesso');
+                forceCloseModals();
+                window.location.assign('/meu-painel');
+                return;
+            }
+
+            await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+            if (foiRebaixadoParaFuncionario) {
+                notify.warning('Administrador rebaixado: role alterada para ROLE_FUNCIONARIO.', 'Aviso');
+            } else {
+                notify.success('Configurações salvas!', 'Sucesso');
+            }
             forceCloseModals();
         },
-        onError: (err) => {
-            const msg = err.response?.data?.message || err.response?.data || "Erro interno";
-            alert("Erro ao salvar: " + msg);
-        }
+        onError: (err) => notify.error(getApiErrorMessage(err, 'Erro ao configurar.'), 'Erro')
     });
 
-    // 3. CÁLCULOS GERAIS
+    const roleModal = String(modalData.role || '').toUpperCase();
+    const perfilProtegido = roleModal.includes('OWNER') || ((roleModal.includes('ADMIN') || roleModal.includes('ROLE_ADMIN')) && modalData.isRoot);
+
+    // --- 3. CÁLCULOS (ESTATÍSTICAS) ---
     const stats = useMemo(() => {
-        const bruto = usuarios.reduce((acc, u) => acc + (u.brutoVendaCalculado || 0) + (u.brutoOsCalculado || 0), 0);
-        const pendente = usuarios.reduce((acc, u) => acc + (u.saldoVendaCalculado || 0) + (u.totalComissaoOsAcumulada || 0), 0);
+        const bruto = usuarios.reduce((acc, u) => acc + (Number(u.brutoVendaCalculado) || 0) + (Number(u.brutoOsCalculado) || 0), 0);
+        const pendente = usuarios.reduce((acc, u) => acc + (Number(u.saldoVendaCalculado) || 0) + (Number(u.totalComissaoOsAcumulada) || 0), 0);
         return { bruto, pendente, total: usuarios.length };
     }, [usuarios]);
 
-    const handleCnpjChange = (e) => {
-        let v = e.target.value.replace(/\D/g, '');
-        if (v.length > 2) v = v.replace(/^(\d{2})(\d)/, '$1.$2');
-        if (v.length > 5) v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
-        if (v.length > 8) v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
-        if (v.length > 12) v = v.replace(/(\d{4})(\d)/, '$1-$2');
-        setCnpjInput(v.substring(0, 18));
-    };
-
-    const formatarMoeda = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
+    // --- 4. RENOVAÇÃO / MERCADO PAGO ---
     const gerarPagamentoMP = async (dias) => {
         try {
             const res = await api.post(`/api/admin/empresa/gerar-renovacao?dias=${dias}`);
             setStatusAssinatura(res.data);
             setViewMP('qr');
             iniciarCheckPagamento(res.data.dias_anteriores || 0);
-        } catch (err) { alert("Erro ao conectar com Mercado Pago."); }
+        } catch {
+            notify.error('Erro ao gerar cobrança Mercado Pago.', 'Erro');
+        }
     };
 
     const iniciarCheckPagamento = (diasAntigos) => {
@@ -105,167 +264,155 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                 const res = await api.get(`/api/pagamentos/assinatura/status-check?diasAnteriores=${diasAntigos}`);
                 if (res.data === true) {
                     clearInterval(interval);
-                    alert("🦈 SHARK ATUALIZADA!");
-                    queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+                    notify.success('Assinatura atualizada! Recarregando…', 'Shark');
+                    await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
                     forceCloseModals();
-                    window.location.reload();
+                    setTimeout(() => window.location.reload(), 2000);
                 }
             } catch (e) { console.error("Erro check pgto", e); }
         }, 5000);
     };
 
-    if (isLoading) return <div className="p-5 text-center text-info"><div className="spinner-border mb-2"></div><p>Sincronizando Shark...</p></div>;
+    if (isLoading) return <div className="p-5 text-center text-info"><div className="spinner-border mb-2"></div><p className="val-mono">Sincronizando Shark...</p></div>;
 
     return (
-        <div className="mt-2 text-white">
-            <style>
-                {`
-                .shark-card { background: #1a1a1a; border-radius: 15px; border-left: 5px solid #333; transition: 0.3s; }
-                .card-ganhos-stats { background: rgba(30, 41, 59, 0.6); border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.05); padding: 1rem; border-left: 4px solid #333; }
-                .badge-proprietario { background: linear-gradient(45deg, #0047ab, #00d4ff); color: white; font-size: 0.6rem; padding: 2px 8px; border-radius: 20px; font-weight: 800; }
-                .valor-mono { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
-                .label-mini { font-size: 0.65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-                .aviso-trava { font-size: 0.65rem; color: #ffc107; background: rgba(255, 193, 7, 0.1); padding: 8px; border-radius: 8px; border: 1px solid rgba(255, 193, 7, 0.2); }
-                .modal-shark-content { background: #111 !important; border: 1px solid #444 !important; color: white !important; border-radius: 15px; }
-                .spin { animation: spin 1s linear infinite; }
-                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                .modal-backdrop { display: none !important; }
-                .modal { background: rgba(0, 0, 0, 0.85); }
-                `}
-            </style>
-
+        <div className="mt-2 text-white pb-5">
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2 className="fw-bold"><i className="bi bi-people-fill text-info me-2"></i> Gestão de Equipe</h2>
-                    <p className="text-white-50 small mb-0">Shark Eletrônicos | Terminal de Liquidação Geral</p>
+                    <h2 className="fw-bold"><i className="bi bi-building text-info me-2"></i> Painel da empresa</h2>
+                    <p className="text-white-50 small mb-0">Equipe, comissões, assinatura e dados da unidade.</p>
                 </div>
-                <div className="badge bg-dark border border-secondary p-2 valor-mono">
+                <div className="badge bg-dark border border-secondary p-2 val-mono">
                     <i className="bi bi-calendar3 me-2 text-info"></i>{new Date().toLocaleDateString('pt-BR')}
                 </div>
             </div>
 
-            <div className="card-ganhos-stats border-left-info p-4 mb-4" style={{ background: 'linear-gradient(90deg, rgba(30, 41, 59, 0.9) 0%, rgba(2, 6, 23, 0.8) 100%)' }}>
-                <div className="row align-items-center">
-                    <div className="col-md-1 d-none d-md-block text-center">
-                        <i className="bi bi-building-fill-check text-info fs-1"></i>
-                    </div>
-                    <div className="col-md-4 border-end border-secondary border-opacity-25 ps-4">
-                        <span className="label-mini text-info">Unidade / Razão Social</span>
-                        <div className="fw-bold fs-5">{empresa.nome || 'Carregando...'}</div>
-                        <span className="badge bg-dark border border-info text-info mt-1" style={{fontSize: '0.6rem'}}>CONTA ATIVA</span>
+            <div className="card-ganhos-stats border-left-info p-4 mb-4" style={{ background: 'var(--shark-gradient-info)' }}>
+                <div className="row align-items-center text-center text-md-start">
+                    <div className="col-md-1 d-none d-md-block text-center"><i className="bi bi-building-fill-check text-info fs-1"></i></div>
+                    <div className="col-md-3 border-end border-secondary border-opacity-25 ps-4">
+                        <span className="label-mini text-info">Unidade</span>
+                        <div className="fw-bold fs-5">{empresa?.nome || 'Shark'}</div>
                     </div>
                     <div className="col-md-2 border-end border-secondary border-opacity-25">
-                        <span className="label-mini">Documento (CNPJ)</span>
-                        <div className="text-white-50 valor-mono">{empresa.cnpj || '---'}</div>
+                        <span className="label-mini">CNPJ</span>
+                        <div className="text-white-50 val-mono small">{formatCnpj(empresa?.cnpj)}</div>
                     </div>
                     <div className="col-md-2 border-end border-secondary border-opacity-25">
-                        <span className="label-mini">Plano Shark</span>
-                        <div className="text-white-50 small">Premium Corporate</div>
-                        <div className={empresa.diasRestantes <= 3 ? 'text-danger fw-bold valor-mono' : 'text-warning fw-bold valor-mono'} style={{fontSize: '0.7rem'}}>
-                            {empresa.diasRestantes || 0} DIAS RESTANTES
+                        <span className="label-mini">WhatsApp</span>
+                        {String(empresa?.whatsapp || '').replace(/\D/g, '').length >= 10 ? (
+                            <a
+                                href={`https://wa.me/55${String(empresa?.whatsapp || '').replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-info val-mono small text-decoration-none"
+                            >
+                                {formatWhatsapp(empresa?.whatsapp)}
+                            </a>
+                        ) : (
+                            <div className="text-white-50 val-mono small">{formatWhatsapp(empresa?.whatsapp)}</div>
+                        )}
+                    </div>
+                    <div className="col-md-2 border-end border-secondary border-opacity-25">
+                        <span className="label-mini">Assinatura</span>
+                        <div className="text-warning fw-bold val-mono" style={{fontSize: '0.7rem'}}>
+                            {empresa?.diasRestantes || 0} DIAS RESTANTES
                         </div>
                     </div>
-                    <div className="col-md-3 d-flex flex-column gap-2 ps-4">
-                        <button className="btn btn-sm btn-warning fw-bold text-dark w-100" data-bs-toggle="modal" data-bs-target="#modalRenovar" onClick={() => setViewMP('selection')}>
-                            <i className="bi bi-lightning-charge-fill me-1"></i> RENOVAR AGORA
-                        </button>
-                        <button className="btn btn-sm btn-outline-info fw-bold w-100" data-bs-toggle="modal" data-bs-target="#modalCnpj">
-                            <i className="bi bi-pencil-square me-1"></i> EDITAR CNPJ
-                        </button>
+                    <div className="col-md-2 d-flex flex-column gap-2 ps-4">
+                        <button type="button" className="btn btn-sm btn-warning fw-bold text-dark w-100" onClick={abrirModalRenovar}>RENOVAR AGORA</button>
+                        <button type="button" className="btn btn-sm btn-outline-info fw-bold w-100" onClick={abrirModalInfo}>EDITAR INFORMAÇÕES</button>
                     </div>
                 </div>
             </div>
 
-            <div className="row g-3 mb-5">
+            <div className="row g-3 mb-4">
                 <div className="col-md-4">
-                    <div className="card-ganhos-stats border-left-info">
-                        <span className="label-mini text-info"><i className="bi bi-graph-up-arrow me-1"></i> Faturamento Bruto Loja</span>
-                        <span className="valor-mono fs-4">{formatarMoeda(stats.bruto)}</span>
+                    <div className="card-ganhos-stats border-left-info text-center">
+                        <span className="label-mini">Faturamento Bruto</span>
+                        <div className="val-mono fs-4">{formatarMoeda(stats.bruto)}</div>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card-ganhos-stats border-left-success">
-                        <span className="label-mini text-success"><i className="bi bi-cash-stack me-1"></i> Comissões Pendentes</span>
-                        <span className="valor-mono fs-4 text-success">{formatarMoeda(stats.pendente)}</span>
+                    <div className="card-ganhos-stats border-left-success text-center">
+                        <span className="label-mini">Comissões Pendentes</span>
+                        <div className="val-mono fs-4 text-success">{formatarMoeda(stats.pendente)}</div>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="card-ganhos-stats border-left-warning">
-                        <span className="label-mini text-warning"><i className="bi bi-person-check me-1"></i> Colaboradores Ativos</span>
-                        <span className="valor-mono fs-4">{stats.total}</span>
+                    <div className="card-ganhos-stats border-left-warning text-center">
+                        <span className="label-mini">Equipe Ativa</span>
+                        <div className="val-mono fs-4">{stats.total}</div>
                     </div>
                 </div>
             </div>
 
-            <div className="card shark-card border-left-info shadow-lg mb-5 overflow-hidden">
+            <div className="shark-card border-left-info shadow-lg mb-5 overflow-hidden p-0">
                 <div className="table-responsive">
                     <table className="table table-dark table-hover mb-0 align-middle text-center">
-                        <thead className="bg-black small text-muted text-uppercase">
+                        <thead>
                         <tr>
                             <th className="ps-4 text-start py-3">Colaborador</th>
-                            <th>Bruto Acumulado</th>
-                            <th>Taxa (%)</th>
-                            <th>Líquido (Pendente)</th>
-                            <th style={{width: '280px'}}>Ação Direta</th>
+                            <th>Taxas</th>
+                            <th>Bruto</th>
+                            <th>Líquido</th>
+                            <th style={{width: '280px'}}>Ação</th>
                             <th className="pe-4 text-end">Ajustes</th>
                         </tr>
                         </thead>
                         <tbody>
                         {usuarios.map(u => {
-                            const liqOs = u.totalComissaoOsAcumulada || 0;
-                            const liqVenda = u.saldoVendaCalculado || 0;
+                            const liqOs = Number(u.totalComissaoOsAcumulada) || 0;
+                            const liqVenda = Number(u.saldoVendaCalculado) || 0;
+                            const brutoOs = Number(u.brutoOsCalculado) || 0;
+                            const brutoVenda = Number(u.brutoVendaCalculado) || 0;
                             const saldoTotal = liqOs + liqVenda;
 
                             return (
                                 <tr key={u.id}>
                                     <td className="ps-4 text-start">
-                                        <div className="fw-bold text-white fs-6">{u.nome}</div>
-                                        {!u.aprovado ? (
-                                            <span className="badge bg-warning text-dark fw-bold" style={{fontSize: '0.6rem'}}>AGUARDANDO APROVAÇÃO</span>
-                                        ) : (
-                                            u.tipoFuncionario === 'PROPRIETARIO' ?
-                                                <span className="badge-proprietario"><i className="bi bi-star-fill me-1"></i>PROPRIETÁRIO</span> :
-                                                <span className="text-info-50 valor-mono small" style={{fontSize: '0.65rem'}}>{u.tipoFuncionario}</span>
-                                        )}
+                                        <div className="fw-bold text-white">{u.nome}</div>
+                                        {u.isRoot && <span className="badge-proprietario ms-1">ROOT</span>}
+                                        {!u.aprovado && <span className="badge bg-warning text-dark fw-bold ms-1" style={{fontSize: '0.6rem'}}>PENDENTE</span>}
                                     </td>
-                                    <td className="valor-mono small text-white-50">
-                                        <div>🛠️ {formatarMoeda(u.brutoOsCalculado || 0)}</div>
-                                        <div>🛒 {formatarMoeda(u.brutoVendaCalculado || 0)}</div>
+                                    <td className="small text-white-50">
+                                        <div>Taxa OS: {Number(u.comissaoOs) || 0}%</div>
+                                        <div>Taxa Vendas: {Number(u.comissaoVenda) || 0}%</div>
                                     </td>
-                                    <td className="small text-info fw-bold">
-                                        <div>🛠️ {u.comissaoOs || 0}%</div>
-                                        <div>🛒 {u.comissaoVenda || 0}%</div>
+                                    <td className="val-mono small text-white-50">
+                                        <div>🛠️ {formatarMoeda(brutoOs)}</div>
+                                        <div>🛒 {formatarMoeda(brutoVenda)}</div>
                                     </td>
-                                    <td className="valor-mono">
-                                        <div className={liqOs > 0.01 ? 'text-success' : 'text-white-50'} style={{fontSize: '0.85rem'}}>🛠️ {formatarMoeda(liqOs)}</div>
-                                        <div className={liqVenda > 0.01 ? 'text-info' : 'text-white-50'} style={{fontSize: '0.85rem'}}>🛒 {formatarMoeda(liqVenda)}</div>
+                                    <td className="val-mono">
+                                        <div className="text-success" style={{fontSize: '0.85rem'}}>🛠️ {formatarMoeda(liqOs)}</div>
+                                        <div className="text-info" style={{fontSize: '0.85rem'}}>🛒 {formatarMoeda(liqVenda)}</div>
                                     </td>
                                     <td>
                                         {!u.aprovado ? (
-                                            <button
-                                                className="btn btn-sm btn-info fw-bold w-100 py-2"
-                                                disabled={aprovarMutation.isPending}
-                                                onClick={() => aprovarMutation.mutate(u.id)}
-                                            >
-                                                {aprovarMutation.isPending ? <i className="bi bi-arrow-repeat spin"></i> : "ACEITAR NOVO"}
-                                            </button>
+                                            <button className="btn btn-sm btn-info fw-bold w-100" onClick={() => aprovarMutation.mutate(u.id)}>ACEITAR</button>
                                         ) : saldoTotal > 0.01 ? (
                                             <div className="d-flex flex-column gap-1">
-                                                {liqVenda > 0.01 && <button className="btn btn-sm btn-info fw-bold py-1" onClick={() => pagarMutation.mutate({funcionarioId: u.id, valorPago: liqVenda, tipoComissao: 'VENDA'})}>PAGAR VENDAS</button>}
-                                                {liqOs > 0.01 && <button className="btn btn-sm btn-success fw-bold py-1" onClick={() => pagarMutation.mutate({funcionarioId: u.id, valorPago: liqOs, tipoComissao: 'OS'})}>PAGAR SERVIÇOS</button>}
+                                                {liqVenda > 0.01 && <button className="btn btn-sm btn-info fw-bold py-1" onClick={() => pagarMutation.mutate({funcionarioId: u.id, valorPago: liqVenda, tipoComissao: 'VENDA'})}>VENDAS</button>}
+                                                {liqOs > 0.01 && <button className="btn btn-sm btn-success fw-bold py-1" onClick={() => pagarMutation.mutate({funcionarioId: u.id, valorPago: liqOs, tipoComissao: 'OS'})}>SERVIÇOS</button>}
                                             </div>
-                                        ) : (
-                                            <div className="bg-black border border-success border-opacity-25 rounded p-1">
-                                                <span className="text-success fw-bold" style={{fontSize: '0.65rem'}}><i className="bi bi-check-all me-1"></i>SALDO ZERADO</span>
-                                            </div>
-                                        )}
+                                        ) : <span className="text-success small fw-bold">ZERADO</span>}
                                     </td>
                                     <td className="pe-4 text-end">
                                         <div className="btn-group gap-1">
-                                            <button className="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#modalComissao" onClick={() => setModalData({ id: u.id, nome: u.nome, tipo: u.tipoFuncionario, comOs: u.comissaoOs, comVenda: u.comissaoVenda, liqOs, liqVenda })}>
+                                            <button type="button" className="btn btn-sm btn-outline-info" onClick={() => abrirModalComissao(u)}>
                                                 <i className="bi bi-gear-fill"></i>
                                             </button>
-                                            <button className="btn btn-sm btn-outline-danger" onClick={() => { if(confirm(`Excluir ${u.nome}?`)) api.delete(`/api/admin/funcionarios/${u.id}`).then(() => queryClient.invalidateQueries(['admin-dados'])) }}>
+                                            <button className="btn btn-sm btn-outline-danger" disabled={u.isRoot} onClick={async () => {
+                                                const ok = await confirmDialog(`Deseja excluir ${u.nome}? Esta ação não pode ser desfeita.`, 'Excluir colaborador');
+                                                if (!ok) return;
+                                                try {
+                                                    await api.delete(`/api/admin/funcionarios/${u.id}`);
+                                                    await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+                                                    notify.success('Colaborador removido.', 'Sucesso');
+                                                } catch {
+                                                    notify.error('Não foi possível excluir.', 'Erro');
+                                                }
+                                            }}>
                                                 <i className="bi bi-person-x-fill"></i>
                                             </button>
                                         </div>
@@ -278,30 +425,28 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                 </div>
             </div>
 
-            {/* HISTÓRICO DE MOVIMENTAÇÕES */}
-            <div className="card shark-card border-left-success p-0 mb-5" style={{background: 'rgba(0,0,0,0.4)'}}>
+            {/* HISTÓRICO */}
+            <div className="shark-card border-left-success p-0 mb-5" style={{background: 'rgba(0,0,0,0.2)'}}>
                 <div className="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
-                    <h5 className="fw-bold text-white mb-0 small text-uppercase"><i className="bi bi-clock-history me-2 text-success"></i> Histórico de Movimentações Recentes</h5>
+                    <h5 className="fw-bold text-white mb-0 small text-uppercase">Movimentações Recentes</h5>
                 </div>
                 <div className="table-responsive">
                     <table className="table table-dark table-sm mb-0 align-middle text-center">
-                        <thead className="bg-black text-muted">
+                        <thead className="text-muted">
                         <tr>
-                            <th className="ps-4 py-2">DATA</th>
-                            <th>PAGADOR</th>
+                            <th className="ps-4 text-start">DATA</th>
                             <th>RECEBEDOR</th>
                             <th>TIPO</th>
                             <th className="pe-4 text-end">VALOR</th>
                         </tr>
                         </thead>
                         <tbody>
-                        {pagamentos.map(p => (
+                        {pagamentos.slice(0, 10).map(p => (
                             <tr key={p.id}>
-                                <td className="ps-4 py-3 text-white-50 valor-mono small">{new Date(p.dataHora).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</td>
-                                <td className="fw-bold text-info">SISTEMA SHARK</td>
+                                <td className="ps-4 text-white-50 val-mono small text-start">{new Date(p.dataHora).toLocaleString('pt-BR')}</td>
                                 <td className="text-white">{p.funcionarioNome}</td>
-                                <td><span className={`badge ${p.tipoComissao === 'VENDA' ? 'bg-info text-dark' : 'bg-success text-white'} px-2`} style={{fontSize:'0.6rem'}}>{p.tipoComissao}</span></td>
-                                <td className="pe-4 text-end text-success fw-bold valor-mono fs-6">{formatarMoeda(p.valorPago)}</td>
+                                <td><span className={`badge ${p.tipoComissao === 'VENDA' ? 'bg-info text-dark' : 'bg-success text-white'}`}>{p.tipoComissao}</span></td>
+                                <td className="pe-4 text-end text-success fw-bold val-mono">{formatarMoeda(p.valorPago)}</td>
                             </tr>
                         ))}
                         </tbody>
@@ -309,92 +454,141 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                 </div>
             </div>
 
-            {/* MODAL CONFIGURAÇÃO TAXAS */}
-            <div className="modal fade" id="modalComissao" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content modal-shark-content p-4">
-                        <div className="modal-header border-0 p-0 mb-3">
-                            <h5 className="text-white fw-bold">Configurar {modalData.nome}</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" onClick={forceCloseModals}></button>
-                        </div>
-                        {(modalData.liqOs > 0.01 || modalData.liqVenda > 0.01) && (
-                            <div className="aviso-trava mb-3 text-center">
-                                <i className="bi bi-lock-fill me-1"></i> Taxas bloqueadas. Liquide os saldos pendentes antes de alterar as porcentagens.
+            {createPortal(
+                <>
+                    {/* MODAL CONFIG TAXAS — em document.body evita conflito com backdrop-filter do main */}
+                    <div className="modal fade" id="modalComissao" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
+                        <div className="modal-dialog modal-dialog-centered">
+                            <div className="modal-content modal-shark-content p-4">
+                                <div className="modal-header border-0 p-0 mb-3">
+                                    <h5 className="text-white fw-bold">Configurar {modalData.nome}</h5>
+                                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label-mini mb-2">Função</label>
+                                    <select className="form-select" value={modalData.tipo} disabled={perfilProtegido} onChange={e => setModalData({...modalData, tipo: e.target.value})}>
+                                        <option value="VENDEDOR">VENDEDOR</option>
+                                        <option value="TECNICO">TÉCNICO</option>
+                                        <option value="PROPRIETARIO">PROPRIETÁRIO (ADMIN)</option>
+                                    </select>
+                                    {perfilProtegido ? (
+                                        <small className="text-warning d-block mt-2">Perfil protegido: cargo não pode ser alterado.</small>
+                                    ) : null}
+                                </div>
+                                <div className="row g-2 mb-4">
+                                    <div className="col-6">
+                                        <label className="label-mini mb-2 text-info">Taxa OS (%)</label>
+                                        <input type="number" className="form-control" value={modalData.comOs} onChange={e => setModalData({...modalData, comOs: Number(e.target.value)})} />
+                                    </div>
+                                    <div className="col-6">
+                                        <label className="label-mini mb-2 text-info">Taxa Vendas (%)</label>
+                                        <input type="number" className="form-control" value={modalData.comVenda} onChange={e => setModalData({...modalData, comVenda: Number(e.target.value)})} />
+                                    </div>
+                                </div>
+                                <button type="button" className="btn btn-info fw-bold w-100 py-2 text-dark" onClick={() => {
+                                    const mudouTipo = String(modalData.tipo || '').trim().toUpperCase() !== String(modalData.tipoOriginal || '').trim().toUpperCase();
+                                    if (perfilProtegido && mudouTipo) {
+                                        notify.error('Perfil protegido não pode ter cargo alterado.', 'Bloqueado');
+                                        return;
+                                    }
+                                    const payload = {
+                                        comissaoOs: modalData.comOs,
+                                        comissaoVenda: modalData.comVenda
+                                    };
+                                    if (!perfilProtegido) {
+                                        payload.tipoFuncionario = modalData.tipo;
+                                    }
+                                    configMutation.mutate({id: modalData.id, payload});
+                                }}>SALVAR ALTERAÇÕES</button>
                             </div>
-                        )}
-                        <div className="mb-3">
-                            <label className="label-mini mb-2">Função do Colaborador</label>
-                            <select className="form-select bg-black text-white border-secondary" value={modalData.tipo} onChange={e => setModalData({...modalData, tipo: e.target.value})}>
-                                <option value="VENDEDOR">VENDEDOR</option>
-                                <option value="TECNICO">TÉCNICO</option>
-                                <option value="PROPRIETARIO">PROPRIETÁRIO</option>
-                            </select>
                         </div>
-                        <div className="row g-2 mb-4">
-                            <div className="col-6">
-                                <label className="label-mini mb-2 text-info">Taxa OS (%)</label>
-                                <input type="number" className="form-control bg-black text-white border-secondary" disabled={modalData.liqOs > 0.01} value={modalData.comOs} onChange={e => setModalData({...modalData, comOs: e.target.value})} />
-                            </div>
-                            <div className="col-6">
-                                <label className="label-mini mb-2 text-info">Taxa Vendas (%)</label>
-                                <input type="number" className="form-control bg-black text-white border-secondary" disabled={modalData.liqVenda > 0.01} value={modalData.comVenda} onChange={e => setModalData({...modalData, comVenda: e.target.value})} />
-                            </div>
-                        </div>
-                        <button className="btn btn-info fw-bold w-100 py-2 text-dark" disabled={modalData.liqOs > 0.01 || modalData.liqVenda > 0.01} onClick={() => configMutation.mutate({id: modalData.id, payload: {tipoFuncionario: modalData.tipo, comissaoOs: modalData.comOs, comVenda: modalData.comVenda}})}>SALVAR ALTERAÇÕES</button>
                     </div>
-                </div>
-            </div>
 
-            {/* MODAL RENOVAÇÃO */}
-            <div className="modal fade" id="modalRenovar" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content modal-shark-content p-4 text-center">
-                        <div className="modal-header border-0 p-0 mb-3">
-                            <h5 className="text-white fw-bold">Renovação Shark PIX</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" onClick={forceCloseModals}></button>
-                        </div>
-                        {viewMP === 'selection' ? (
-                            <div className="d-grid gap-2">
-                                <button className="btn btn-lg btn-primary fw-bold" onClick={() => gerarPagamentoMP(30)}>RENOVAR 30 DIAS - R$ 60,00</button>
-                                <button className="btn btn-outline-info" onClick={() => gerarPagamentoMP(365)}>PLANO ANUAL (DESCONTO)</button>
+                    <div className="modal fade" id="modalRenovar" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
+                        <div className="modal-dialog modal-dialog-centered">
+                            <div className="modal-content modal-shark-content p-4 text-center">
+                                <div className="modal-header border-0 p-0 mb-3">
+                                    <h5 className="text-white fw-bold">Renovação Shark PIX</h5>
+                                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                {viewMP === 'selection' ? (
+                                    <div className="d-grid gap-2">
+                                        <button type="button" className="btn btn-lg btn-primary fw-bold" onClick={() => gerarPagamentoMP(30)}>30 DIAS - R$ 60</button>
+                                        <button type="button" className="btn btn-outline-info" onClick={() => gerarPagamentoMP(365)}>ANUAL (DESCONTO)</button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <img src={`data:image/jpeg;base64,${statusAssinatura.qr_code_base64}`} alt="QR" className="mb-3 bg-white p-2 rounded mx-auto d-block" style={{ width: '200px' }} />
+                                        <div className="bg-black p-2 rounded small text-info val-mono mb-3" style={{wordBreak: 'break-all'}}>{statusAssinatura.qr_code}</div>
+                                        <p className="small text-warning"><i className="bi bi-arrow-repeat spin me-2"></i>Aguardando PIX...</p>
+                                    </>
+                                )}
                             </div>
-                        ) : (
-                            <>
-                                <img src={`data:image/jpeg;base64,${statusAssinatura.qr_code_base64}`} alt="QR Code" className="mb-3 bg-white p-2 rounded" style={{ width: '200px' }} />
-                                <div className="bg-black p-2 rounded small text-info valor-mono mb-3" style={{wordBreak: 'break-all'}}>{statusAssinatura.qr_code}</div>
-                                <p className="small text-warning"><i className="bi bi-arrow-repeat spin me-2"></i>Aguardando confirmação...</p>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* MODAL CNPJ */}
-            <div className="modal fade" id="modalCnpj" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content modal-shark-content p-4">
-                        <div className="modal-header border-0 p-0 mb-3">
-                            <h5 className="text-white fw-bold">Atualizar CNPJ</h5>
-                            <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" onClick={forceCloseModals}></button>
                         </div>
-                        <input type="text" className="form-control bg-black text-white border-secondary mb-3 valor-mono" value={cnpjInput} onChange={handleCnpjChange} placeholder="00.000.000/0000-00" />
-                        <button className="btn btn-info fw-bold w-100" onClick={() => {
-                            if (!cnpjInput || cnpjInput.trim() === "") { alert("Informe o CNPJ"); return; }
-                            api.post('/api/admin/empresa/atualizar-cnpj', { cnpj: cnpjInput })
-                                .then(() => {
-                                    queryClient.invalidateQueries(['admin-dados']);
-                                    forceCloseModals();
-                                    alert('🦈 Shark Atualizada: CNPJ salvo com sucesso!');
-                                })
-                                .catch(err => {
-                                    console.error(err);
-                                    const msg = err.response?.data?.message || err.response?.data || err.message;
-                                    alert("Erro ao atualizar: " + msg);
-                                });
-                        }}>SALVAR DOCUMENTO</button>
                     </div>
-                </div>
-            </div>
+
+                    <div className="modal fade" id="modalCnpj" tabIndex="-1" aria-hidden="true" data-bs-backdrop="static">
+                        <div className="modal-dialog modal-dialog-centered">
+                            <div className="modal-content modal-shark-content p-4">
+                                <div className="modal-header border-0 p-0 mb-3">
+                                    <h5 className="text-white fw-bold">Editar informações da empresa</h5>
+                                    <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                                </div>
+                                <input type="text" className="form-control mb-3" value={nomeEmpresaInput} onChange={(e) => setNomeEmpresaInput(e.target.value)} placeholder="Nome da empresa" />
+                                <input type="text" className="form-control mb-3 val-mono" value={cnpjInput} onChange={handleCnpjChange} placeholder="CNPJ (opcional)" />
+                                <input type="text" className="form-control mb-3 val-mono" value={whatsappEmpresaInput} onChange={handleEmpresaWhatsappChange} placeholder="WhatsApp da empresa" />
+                                <button type="button" className="btn btn-info fw-bold w-100" onClick={() => {
+                                    if (!nomeEmpresaInput.trim()) {
+                                        notify.error('Nome da empresa é obrigatório.', 'Empresa');
+                                        return;
+                                    }
+                                    const cnpjDigits = String(cnpjInput || '').replace(/\D/g, '');
+                                    const whatsappDigits = String(whatsappEmpresaInput || '').replace(/\D/g, '');
+                                    if (cnpjDigits.length > 0 && cnpjDigits.length < 14) {
+                                        notify.error('CNPJ incompleto. Informe os 14 dígitos.', 'Empresa');
+                                        return;
+                                    }
+                                    if (whatsappDigits.length < 11) {
+                                        notify.error('WhatsApp incompleto. Informe DDD + número (11 dígitos).', 'Empresa');
+                                        return;
+                                    }
+                                    const payload = {
+                                        nome: nomeEmpresaInput,
+                                        cnpj: cnpjInput,
+                                        whatsapp: whatsappEmpresaInput
+                                    };
+                                    api.post('/api/admin/empresa/atualizar-informacoes', payload)
+                                        .then(async () => {
+                                            await queryClient.invalidateQueries({queryKey:['admin-dados']});
+                                            hideBsModal('modalCnpj');
+                                            notify.success('Informações da empresa atualizadas.', 'Sucesso');
+                                        })
+                                        .catch(async (err) => {
+                                            const msg = getApiErrorMessage(err, '');
+                                            const rotaNovaIndisponivel =
+                                                err?.response?.status === 404 ||
+                                                (typeof msg === 'string' && msg.includes('No static resource api/admin/empresa/atualizar-informacoes'));
+                                            if (rotaNovaIndisponivel) {
+                                                try {
+                                                    await api.post('/api/admin/empresa/atualizar-cnpj', { cnpj: payload.cnpj });
+                                                    await queryClient.invalidateQueries({queryKey:['admin-dados']});
+                                                    hideBsModal('modalCnpj');
+                                                    notify.warning('Back antigo detectado: apenas CNPJ foi atualizado. Reinicie o backend para salvar nome e WhatsApp.', 'Empresa');
+                                                    return;
+                                                } catch (fallbackErr) {
+                                                    notify.error(getApiErrorMessage(fallbackErr, 'Erro ao atualizar informações.'), 'Empresa');
+                                                    return;
+                                                }
+                                            }
+                                            notify.error(msg || 'Erro ao atualizar informações.', 'Empresa');
+                                        });
+                                }}>SALVAR</button>
+                            </div>
+                        </div>
+                    </div>
+                </>,
+                document.body
+            )}
         </div>
     );
 };
