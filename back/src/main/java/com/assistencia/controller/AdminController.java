@@ -4,6 +4,7 @@ import com.assistencia.model.*;
 import com.assistencia.repository.*;
 import com.assistencia.util.SecurityUtils;
 import com.assistencia.service.EmailService;
+import com.assistencia.service.WhatsappService;
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.common.IdentificationRequest;
 import com.mercadopago.client.payment.PaymentClient;
@@ -23,7 +24,6 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/admin")
 @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class AdminController {
 
     private final ClienteRepository clienteRepo;
@@ -38,6 +38,9 @@ public class AdminController {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private WhatsappService whatsappService;
 
     @Value("${mercado_pago_sample_access_token}")
     private String mpAccessToken;
@@ -268,6 +271,17 @@ public class AdminController {
                         u.getEmail(),
                         u.getNome(),
                         u.getEmpresa().getNome()
+                );
+
+                whatsappService.enviarFuncionarioAprovado(
+                        u.getWhatsapp(),
+                        u.getEmpresa().getNome(),
+                        admin.getNome(),
+                        u.getUsername(),
+                        u.getNome(),
+                        u.getCpf(),
+                        u.getEmail(),
+                        u.getWhatsapp()
                 );
 
                 return ResponseEntity.ok().build();

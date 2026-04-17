@@ -18,7 +18,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/estoque")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class EstoqueController {
 
     private final ProdutoRepository repo;

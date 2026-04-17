@@ -6,7 +6,8 @@ RUN npm install
 
 COPY . .
 
-ARG VITE_API_URL=http://localhost:4444
+# Em build Docker omitimos URL fixa: o front usa o hostname da pagina + porta 4444 (ver src/api.js).
+ARG VITE_API_URL=
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 

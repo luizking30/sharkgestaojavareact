@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const baseURL = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+const runtimeHost = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
+const defaultBaseURL = `http://${runtimeHost}:4444`;
+const baseURL = (import.meta.env.VITE_API_URL || defaultBaseURL).replace(/\/$/, '');
 
 const api = axios.create({
     baseURL,

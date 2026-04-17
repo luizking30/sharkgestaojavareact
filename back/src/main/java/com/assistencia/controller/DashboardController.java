@@ -16,7 +16,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/dashboard")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class DashboardController {
 
     private final ClienteRepository clienteRepository;

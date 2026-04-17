@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/relatorios")
 @PreAuthorize("hasRole('ADMIN')")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class RelatorioController {
 
     @Autowired private VendaRepository vendaRepository;

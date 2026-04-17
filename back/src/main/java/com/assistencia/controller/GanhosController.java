@@ -16,7 +16,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/usuarios")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class GanhosController {
 
     private final VendaRepository vendaRepo;

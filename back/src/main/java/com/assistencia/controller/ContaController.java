@@ -20,7 +20,6 @@ import java.util.stream.Collectors;
 
 @RestController // MUDOU: Agora é uma API
 @RequestMapping("/api/contas") // MUDOU: Padronizado /api/
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class ContaController {
 
     @Autowired

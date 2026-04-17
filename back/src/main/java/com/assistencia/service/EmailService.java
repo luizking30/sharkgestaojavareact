@@ -3,6 +3,7 @@ package com.assistencia.service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -13,12 +14,19 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
+    @Value("${app.frontend.login-url:https://sharkgestao.com/login}")
+    private String frontendLoginUrl;
+
+    @Value("${app.frontend.base-url:https://sharkgestao.com}")
+    private String frontendBaseUrl;
+
     private final String EMAIL_SHARK = "gestaoempresarialshark@gmail.com";
     private final String COR_PRINCIPAL = "#0047ab"; // Azul Shark
     private final String COR_DESTAQUE = "#00d4ff"; // Azul Claro
 
     public void enviarEmailRecuperacao(String para, String token) {
-        String linkRecuperacao = "http://localhost:5173/resetar-senha?token=" + token;
+        String base = frontendBaseUrl.replaceAll("/$", "");
+        String linkRecuperacao = base + "/resetar-senha?token=" + token;
 
         String conteudoHtml = montarLayoutHtml(
                 "Recuperação de Acesso",
@@ -33,10 +41,11 @@ public class EmailService {
     }
 
     public void enviarBoasVindasEmpresa(String para, String nomeEmpresa, String cnpj, String login, String cpf, String whatsapp) {
-        String linkAcesso = "http://localhost:5173/";
+        String linkAcesso = frontendLoginUrl;
 
         String detalhesVindas =
                 "<p>Bem-vindo ao <strong>Sistema de Gestão Empresarial Shark</strong>!</p>" +
+                        "<p><strong>Faça login aqui:</strong> <a href='" + linkAcesso + "' style='color: " + COR_PRINCIPAL + "; font-weight: bold;'>" + linkAcesso + "</a></p>" +
                         "<p>Você acaba de ganhar <strong>7 dias de teste grátis</strong> para explorar todas as nossas ferramentas.</p>" +
                         "<div style='background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid " + COR_PRINCIPAL + ";'>" +
                         "  <h3 style='margin-top: 0; color: " + COR_PRINCIPAL + ";'>Suas Credenciais:</h3>" +
@@ -52,14 +61,14 @@ public class EmailService {
                 "Bem-vindo à Shark!",
                 detalhesVindas,
                 linkAcesso,
-                "Acessar Meu Painel",
+                "Fazer login",
                 "<p style='font-size: 0.9em; color: #666;'>Guarde este e-mail para consultas futuras de suas credenciais.</p>"
         );
 
         dispararEmailHtml(para, "Bem-vindo ao Sistema Shark!", conteudoHtml);
     }
     public void enviarEmailAprovacaoFuncionario(String para, String nomeFuncionario, String nomeEmpresa) {
-        String linkAcesso = "http://localhost:5173/";
+        String linkAcesso = frontendLoginUrl;
 
         String corpoTxt =
                 "<p>Olá, <strong>" + nomeFuncionario + "</strong>!</p>" +
@@ -70,17 +79,18 @@ public class EmailService {
                 "Acesso Liberado!",
                 corpoTxt,
                 linkAcesso,
-                "Acessar Meu Painel",
+                "Fazer login",
                 "<p style='font-size: 0.9em; color: #666;'>Bom trabalho e boas vendas!</p>"
         );
 
         dispararEmailHtml(para, "Sua conta foi aprovada! | Shark Gestão", conteudoHtml);
     }
     public void enviarBoasVindasFuncionario(String para, String nomeEmpresa, String login, String cpf, String whatsapp) {
-        String linkAcesso = "http://localhost:5173/";
+        String linkAcesso = frontendLoginUrl;
 
         String detalhesFuncionario =
                 "<p>Bem-vindo ao <strong>Sistema de Gestão Empresarial Shark</strong>!</p>" +
+                        "<p><strong>Faça login aqui:</strong> <a href='" + linkAcesso + "' style='color: " + COR_PRINCIPAL + "; font-weight: bold;'>" + linkAcesso + "</a></p>" +
                         "<p>Você se cadastrou como funcionário na empresa: <strong>" + nomeEmpresa + "</strong></p>" +
                         "<div style='background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid " + COR_PRINCIPAL + ";'>" +
                         "  <h3 style='margin-top: 0; color: " + COR_PRINCIPAL + ";'>Suas Credenciais:</h3>" +
@@ -95,7 +105,7 @@ public class EmailService {
                 "Bem-vindo à Equipe Shark!",
                 detalhesFuncionario,
                 linkAcesso,
-                "Acessar Meu Painel",
+                "Fazer login",
                 "<p style='font-size: 0.9em; color: #666;'>Guarde este e-mail para consultas futuras de suas credenciais.</p>"
         );
 

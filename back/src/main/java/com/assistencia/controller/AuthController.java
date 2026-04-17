@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
@@ -129,7 +128,10 @@ public class AuthController {
                     salvo.getWhatsapp(),
                     emp.getNome(),
                     salvo.getUsername(),
-                    salvo.getCpf()
+                    salvo.getNome(),
+                    salvo.getCpf(),
+                    salvo.getEmail(),
+                    salvo.getWhatsapp()
             );
 
             return ResponseEntity.ok(salvo);
@@ -202,21 +204,60 @@ public class AuthController {
 
             usuarioRepository.save(usuario);
 
-            String whatsappDestino = (whatsappEmpresaLimpo != null && !whatsappEmpresaLimpo.isBlank())
-                    ? whatsappEmpresaLimpo
-                    : usuario.getWhatsapp();
-            log.info("Destino WhatsApp boas-vindas empresa '{}': {}", nomeEmpresa, whatsappDestino);
-
             try {
-                whatsappService.enviarBoasVindasEmpresa(
-                        whatsappDestino,
-                        nomeEmpresa,
-                        usuario.getUsername(),
-                        usuario.getCpf()
-                );
-                log.info("Disparo de WhatsApp de boas-vindas concluido para empresa '{}'", nomeEmpresa);
+                String wppEmpresa = whatsappEmpresaLimpo;
+                String wppDono = usuario.getWhatsapp();
+
+                if (whatsappService.numerosWhatsAppIguais(wppEmpresa, wppDono)) {
+                    String unico = (wppEmpresa != null && !wppEmpresa.isBlank()) ? wppEmpresa : wppDono;
+                    log.info("WhatsApp boas-vindas empresa '{}': mesmo numero empresa/dono ({}), enviando uma vez", nomeEmpresa, unico);
+                    whatsappService.enviarBoasVindasEmpresa(
+                            unico,
+                            salva.getId(),
+                            nomeEmpresa,
+                            cnpjLimpo,
+                            whatsappEmpresaLimpo,
+                            usuario.getNome(),
+                            usuario.getUsername(),
+                            usuario.getEmail(),
+                            usuario.getWhatsapp(),
+                            usuario.getCpf()
+                    );
+                } else {
+                    if (wppEmpresa != null && !wppEmpresa.isBlank()) {
+                        log.info("WhatsApp boas-vindas empresa '{}': enviando para WhatsApp da empresa {}", nomeEmpresa, wppEmpresa);
+                        whatsappService.enviarBoasVindasEmpresa(
+                                wppEmpresa,
+                                salva.getId(),
+                                nomeEmpresa,
+                                cnpjLimpo,
+                                whatsappEmpresaLimpo,
+                                usuario.getNome(),
+                                usuario.getUsername(),
+                                usuario.getEmail(),
+                                usuario.getWhatsapp(),
+                                usuario.getCpf()
+                        );
+                    }
+                    if (wppDono != null && !wppDono.isBlank()) {
+                        log.info("WhatsApp boas-vindas empresa '{}': enviando para WhatsApp do proprietario {}", nomeEmpresa, wppDono);
+                        whatsappService.enviarBoasVindasEmpresa(
+                                wppDono,
+                                salva.getId(),
+                                nomeEmpresa,
+                                cnpjLimpo,
+                                whatsappEmpresaLimpo,
+                                usuario.getNome(),
+                                usuario.getUsername(),
+                                usuario.getEmail(),
+                                usuario.getWhatsapp(),
+                                usuario.getCpf()
+                        );
+                    }
+                }
+                log.info("Disparo(s) de WhatsApp de boas-vindas concluido para empresa '{}'", nomeEmpresa);
             } catch (Exception ex) {
-                log.error("Falha ao enviar WhatsApp de boas-vindas da empresa {} para {}: {}", nomeEmpresa, whatsappDestino, ex.getMessage());
+                log.error("Falha ao enviar WhatsApp de boas-vindas da empresa {}: {}", nomeEmpresa, ex.getMessage());
             }
 
             try {

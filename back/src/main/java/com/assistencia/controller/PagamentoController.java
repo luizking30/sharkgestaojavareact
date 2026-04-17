@@ -15,7 +15,6 @@ import java.util.Map;
 
 @RestController // MUDOU: Agora é uma API REST
 @RequestMapping("/api/pagamentos") // MUDOU: Padronizado com /api/
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class PagamentoController {
 
     private final UsuarioRepository usuarioRepository;

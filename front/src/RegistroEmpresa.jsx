@@ -145,6 +145,12 @@ function RegistroEmpresa() {
                 </div>
 
                 <form onSubmit={handleSubmit}>
+                    {erros.geral && (
+                        <div className="alert alert-danger py-2" role="alert">
+                            {erros.geral}
+                        </div>
+                    )}
+
                     <div className="section-title">Dados da Loja</div>
 
                     <div className="mb-3">

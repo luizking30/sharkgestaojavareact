@@ -21,7 +21,6 @@ import java.util.Map;
 
 @RestController // MUDOU: Agora é uma API
 @RequestMapping("/api/pagamento") // MUDOU: Padronizado
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class DiasPagoController {
 
     @Autowired

@@ -29,7 +29,6 @@ import java.util.*;
 
 @RestController // MUDOU: Padrão API REST
 @RequestMapping("/api/ordens") // MUDOU: Padronizado com /api/
-@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class OrdemServicoController {
 
     private final OrdemServicoRepository ordemRepo;
