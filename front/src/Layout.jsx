@@ -47,6 +47,23 @@ const Layout = ({ children, usuarioLogado, onLogout }) => {
     setIsMenuOpen(false);
   }, [location]);
 
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 991.98px)');
+    const applyBodyScroll = () => {
+      if (mq.matches && isMenuOpen) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    };
+    applyBodyScroll();
+    mq.addEventListener('change', applyBodyScroll);
+    return () => {
+      mq.removeEventListener('change', applyBodyScroll);
+      document.body.style.overflow = '';
+    };
+  }, [isMenuOpen]);
+
   const handleLogout = (e) => {
     e.preventDefault();
 
@@ -83,17 +100,30 @@ const Layout = ({ children, usuarioLogado, onLogout }) => {
             </div>
         )}
 
+        <button
+          type="button"
+          className={`shark-nav-overlay d-lg-none${isMenuOpen ? ' is-visible' : ''}`}
+          aria-label="Fechar menu"
+          onClick={() => setIsMenuOpen(false)}
+        />
+
         <nav className="navbar navbar-expand-lg navbar-dark sticky-top shadow-lg">
           <div className="container-fluid">
             <Link className="navbar-brand" to="/dashboard">
-              <img src="/images/logo_layout.png" alt="Shark" style={{ height: '100px' }} />
+              <img src="/images/logo_layout.png" alt="Shark" className="shark-navbar-logo" />
             </Link>
 
-            <button className="navbar-toggler" type="button" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            <button
+              className="navbar-toggler"
+              type="button"
+              aria-expanded={isMenuOpen}
+              aria-controls="shark-navbar-collapse"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
               <span className="navbar-toggler-icon"></span>
             </button>
 
-            <div className={`collapse navbar-collapse ${isMenuOpen ? 'show' : ''}`}>
+            <div id="shark-navbar-collapse" className={`collapse navbar-collapse ${isMenuOpen ? 'show' : ''}`}>
               <ul className="navbar-nav me-auto">
                 {!isBloqueado && (
                     <>
@@ -161,7 +191,7 @@ const Layout = ({ children, usuarioLogado, onLogout }) => {
           </div>
         </nav>
 
-        <main className="container shadow-lg">
+        <main className="container-fluid shark-main-shell shadow-lg">
           {children}
         </main>
 

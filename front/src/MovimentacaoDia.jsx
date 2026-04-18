@@ -61,7 +61,7 @@ const MovimentacaoDia = () => {
     return (
         <div className="mt-2 text-white">
             <div className="mb-4">
-                <h2 className="mb-0 text-white fw-bold">
+                <h2 className="shark-page-title mb-0 text-white fw-bold">
                     <i className="bi bi-speedometer2 text-white glow-success me-2"></i> MOVIMENTAÇÃO DO DIA
                 </h2>
             </div>
@@ -72,28 +72,28 @@ const MovimentacaoDia = () => {
             )}
 
             <div className="row g-4 mb-4">
-                <div className="col-md-3">
+                <div className="col-12 col-sm-6 col-md-3">
                     <div className="card p-4 text-center h-100 shark-stat-card border-left-primary">
                         <div className="mb-2"><i className="bi bi-people-fill text-primary fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">Clientes Novos</h6>
                         <h2 className="text-primary mb-0 fw-bold">{clientesHoje}</h2>
                     </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-12 col-sm-6 col-md-3">
                     <div className="card p-4 text-center h-100 shark-stat-card border-left-info">
                         <div className="mb-2"><i className="bi bi-file-earmark-medical text-info fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">OS Criadas</h6>
                         <h2 className="text-info mb-0 fw-bold">{osCriadasHoje}</h2>
                     </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-12 col-sm-6 col-md-3">
                     <div className="card p-4 text-center h-100 shark-stat-card border-left-success">
                         <div className="mb-2"><i className="bi bi-cart-check-fill text-success fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">Vendas Feitas</h6>
                         <h2 className="text-success mb-0 fw-bold">{vendasHoje}</h2>
                     </div>
                 </div>
-                <div className="col-md-3">
+                <div className="col-12 col-sm-6 col-md-3">
                     <div className="card p-4 text-center h-100 shark-stat-card border-left-warning">
                         <div className="mb-2"><i className="bi bi-box-seam-fill text-warning fs-1"></i></div>
                         <h6 className="text-white-50 small fw-bold text-uppercase">OS Entregues</h6>
@@ -105,7 +105,7 @@ const MovimentacaoDia = () => {
             {/* SEÇÃO DE VENDAS */}
             <h5 className="text-white small fw-bold mb-3 text-uppercase"><i className="bi bi-bag-check me-2"></i>Vendas de hoje</h5>
             <div className="row g-4 mb-5">
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card p-4 h-100 shark-stat-card border-left-success">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
@@ -116,7 +116,7 @@ const MovimentacaoDia = () => {
                         </div>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card p-4 h-100 shark-stat-card border-left-danger">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
@@ -127,7 +127,7 @@ const MovimentacaoDia = () => {
                         </div>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card p-4 h-100 shark-stat-card border-left-info shark-stat-card--gradient">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
@@ -146,7 +146,7 @@ const MovimentacaoDia = () => {
             {/* SEÇÃO DE SERVIÇOS */}
             <h5 className="text-white small fw-bold mb-3 text-uppercase"><i className="bi bi-tools me-2"></i>Serviços entregues hoje</h5>
             <div className="row g-4 mb-5">
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card p-4 h-100 shark-stat-card border-left-success">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
@@ -157,7 +157,7 @@ const MovimentacaoDia = () => {
                         </div>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card p-4 h-100 shark-stat-card border-left-danger">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>
@@ -168,7 +168,7 @@ const MovimentacaoDia = () => {
                         </div>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card p-4 h-100 shark-stat-card border-left-info shark-stat-card--gradient">
                         <div className="d-flex justify-content-between align-items-center">
                             <div>

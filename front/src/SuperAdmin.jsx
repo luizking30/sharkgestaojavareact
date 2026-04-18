@@ -117,7 +117,7 @@ const SuperAdmin = () => {
         <div className="mt-2 text-white">
             <div className="d-flex flex-wrap justify-content-between align-items-end mb-4 gap-2">
                 <div>
-                    <h2 className="fw-bold text-warning">
+                    <h2 className="shark-page-title fw-bold text-warning">
                         <i className="bi bi-crown-fill me-2"></i> Painel Global (Fundador)
                     </h2>
                     <p className="text-white-50 small mb-0">
@@ -137,20 +137,20 @@ const SuperAdmin = () => {
             </div>
 
             <div className="row g-3 mb-4 text-center">
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card-super p-3">
                         <span className="text-muted small d-block">TOTAL EMPRESAS</span>
                         <span className="fs-3 fw-bold text-info">{empresas?.length}</span>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card-super p-3">
                         <span className="text-muted small d-block">FATURAMENTO SAAS (MP — mês {mesRef})</span>
                         <span className="fs-3 fw-bold text-success">{fmtMoney(totalMes)}</span>
                         <div className="small text-white-50 mt-1">Soma dos webhooks aprovados registrados no backend</div>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card-super p-3">
                         <span className="text-muted small d-block">SITUAÇÃO GERAL</span>
                         <span className="fs-3 fw-bold text-warning">ESTÁVEL</span>
@@ -165,7 +165,7 @@ const SuperAdmin = () => {
                         Pagamentos recebidos (Mercado Pago) — mês atual
                     </h6>
                 </div>
-                <div className="table-responsive">
+                <div className="table-responsive shark-mobile-cards">
                     <table className="table table-dark table-hover mb-0 align-middle small">
                         <thead className="bg-black text-muted text-uppercase">
                             <tr>
@@ -188,18 +188,18 @@ const SuperAdmin = () => {
                             )}
                             {pagamentosMes.map((p) => (
                                 <tr key={p.id}>
-                                    <td className="ps-3 val-mono">{p.dataHora ?? '—'}</td>
-                                    <td className="fw-semibold text-success">{fmtMoney(p.valor)}</td>
-                                    <td>{p.pagadorNome ?? '—'}</td>
-                                    <td className="val-mono">{p.pagadorEmail ?? '—'}</td>
-                                    <td>
+                                    <td className="ps-3 val-mono" data-label="Data / hora">{p.dataHora ?? '—'}</td>
+                                    <td className="fw-semibold text-success" data-label="Valor">{fmtMoney(p.valor)}</td>
+                                    <td data-label="Quem pagou">{p.pagadorNome ?? '—'}</td>
+                                    <td className="val-mono" data-label="E-mail">{p.pagadorEmail ?? '—'}</td>
+                                    <td data-label="Empresa">
                                         <span className="fw-semibold">{p.empresaNome ?? '—'}</span>
                                         {p.empresaId != null && (
                                             <span className="text-muted small d-block">ID #{p.empresaId}</span>
                                         )}
                                     </td>
-                                    <td className="text-center">{p.diasCreditados ?? '—'}</td>
-                                    <td className="pe-3 val-mono">{p.mpPaymentId ?? '—'}</td>
+                                    <td className="text-center" data-label="Dias creditados">{p.diasCreditados ?? '—'}</td>
+                                    <td className="pe-3 val-mono" data-label="ID MP">{p.mpPaymentId ?? '—'}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -280,7 +280,7 @@ const SuperAdmin = () => {
                             <div className="px-3 py-2 bg-black bg-opacity-25 border-bottom border-secondary small text-white-50">
                                 Colaboradores / usuários vinculados a esta empresa ({(emp.usuarios || []).length})
                             </div>
-                            <div className="table-responsive">
+                            <div className="table-responsive shark-mobile-cards">
                                 <table className="table table-dark table-hover mb-0 align-middle">
                                     <thead className="bg-black text-muted small text-uppercase">
                                         <tr>
@@ -298,25 +298,25 @@ const SuperAdmin = () => {
                                     <tbody>
                                         {(emp.usuarios || []).map((u) => (
                                             <tr key={u.id}>
-                                                <td className="ps-4">
+                                                <td className="ps-4" data-label="Usuário">
                                                     <div className="fw-semibold">{u.nome}</div>
                                                     <span className="text-muted small val-mono">@{u.username}</span>
                                                     {u.isRoot && (
                                                         <span className="badge bg-warning text-dark ms-1 small">root</span>
                                                     )}
                                                 </td>
-                                                <td className="val-mono small">{u.cpf}</td>
-                                                <td className="val-mono small">{u.whatsapp}</td>
-                                                <td className="small">{u.email}</td>
-                                                <td className="text-center small">{u.role}</td>
-                                                <td className="text-center">{u.diasNaPlataforma ?? '—'}</td>
-                                                <td className="text-center">{u.diasPlanoEmpresa ?? '—'}</td>
-                                                <td className="text-center">
+                                                <td className="val-mono small" data-label="CPF">{u.cpf}</td>
+                                                <td className="val-mono small" data-label="WhatsApp">{u.whatsapp}</td>
+                                                <td className="small" data-label="E-mail">{u.email}</td>
+                                                <td className="text-center small" data-label="Cargo">{u.role}</td>
+                                                <td className="text-center" data-label="Dias na plataforma">{u.diasNaPlataforma ?? '—'}</td>
+                                                <td className="text-center" data-label="Dias plano">{u.diasPlanoEmpresa ?? '—'}</td>
+                                                <td className="text-center" data-label="Status">
                                                     <span className={`badge ${u.aprovado ? 'bg-success' : 'bg-secondary'}`}>
                                                         {u.aprovado ? 'Aprovado' : 'Pendente'}
                                                     </span>
                                                 </td>
-                                                <td className="pe-4 text-end">
+                                                <td className="pe-4 text-end" data-label="Ações">
                                                     <button
                                                         type="button"
                                                         className="btn btn-sm btn-outline-danger btn-super-action"

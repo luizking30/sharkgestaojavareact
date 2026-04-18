@@ -19,6 +19,8 @@
     align-items: center; 
     min-height: 100vh; 
     margin: 0; 
+    padding: 16px;
+    overflow-x: hidden;
 }
 
 .login-card { 
@@ -54,6 +56,7 @@
 .btn-login { 
     width: 100%; 
     padding: 14px; 
+    min-height: 48px;
     background: var(--shark-blue); 
     border: 1px solid var(--shark-light-blue); 
     color: white; 
@@ -73,6 +76,7 @@
 
 .btn-toggle-reg { 
     background: transparent; 
+    min-height: 48px;
     border: 1px dashed var(--text-muted); 
     color: var(--text-muted); 
     font-weight: 700; 
@@ -94,6 +98,11 @@
 
 .forgot-link { 
     color: var(--text-muted); 
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
     font-size: 0.75rem; 
     text-decoration: none; 
     font-weight: 600; 
@@ -137,4 +146,15 @@
 /* Garante que a label também mude de cor no erro */
 .is-invalid-shark ~ label {
     color: var(--shark-red) !important;
+}
+
+@media (max-width: 576px) {
+    .login-card {
+        padding: 20px 16px;
+        border-radius: 16px;
+    }
+
+    .brand-logo {
+        width: 200px;
+    }
 }

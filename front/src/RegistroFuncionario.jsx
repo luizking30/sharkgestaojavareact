@@ -120,7 +120,7 @@ function RegistroFuncionario() {
         <div className="login-card">
           <div className="text-center mb-4">
             <img src="/images/logo.png" alt="Shark" style={{ width: '180px', filter: 'drop-shadow(0 0 5px rgba(0,212,255,0.4))' }} />
-            <h5 className="mt-3" style={{ color: 'var(--shark-light-blue)', fontWeight: 800 }}>CADASTRO DE FUNCIONÁRIO</h5>
+            <h5 className="shark-page-title mt-3" style={{ color: 'var(--shark-light-blue)', fontWeight: 800 }}>CADASTRO DE FUNCIONÁRIO</h5>
           </div>
 
           {/* 🦈 EXIBIÇÃO DE ERRO GERAL (Caso o servidor caia) */}

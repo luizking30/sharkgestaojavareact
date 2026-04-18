@@ -10,6 +10,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 
 // --- 2. ESTILOS PERSONALIZADOS ---
 import './App.css'
+import './shark-mobile-first.css'
 import './Login.css'
 
 import App from './App.jsx'

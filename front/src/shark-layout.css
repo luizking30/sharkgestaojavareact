@@ -36,11 +36,11 @@
     text-align: center;
 }
 
-.layout-wrapper main.container {
+.layout-wrapper main.container,
+.layout-wrapper main.shark-main-shell {
     background: rgba(22, 27, 34, 0.45);
     backdrop-filter: blur(10px);
     border-radius: 20px;
-    padding: 30px;
     margin-top: 2rem;
     margin-bottom: 2rem;
     border: 1px solid var(--shark-border);

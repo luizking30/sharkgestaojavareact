@@ -204,14 +204,14 @@ const Vendas = ({ usuarioLogado }) => {
     return (
         <div className="mt-2 text-white">
 
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 className="fw-bold mb-0">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+                <div className="w-100 w-md-auto">
+                    <h2 className="shark-page-title fw-bold mb-0">
                         <i className="bi bi-cart-plus glow-info" style={{ color: '#0dcaf0' }}></i> PDV Shark Eletrônicos
                     </h2>
                     <p className="text-white-50 small">Terminal de Venda Direta | <span className="text-info">Unidade Brasília</span></p>
                 </div>
-                <span className="badge bg-black border border-info text-info px-3 py-2" style={{ fontSize: '1rem' }}>
+                <span className="badge bg-black border border-info text-info px-3 py-2 align-self-start align-self-md-center" style={{ fontSize: '1rem' }}>
                     <i className="bi bi-clock me-2"></i>{relogio}
                 </span>
             </div>
@@ -219,7 +219,7 @@ const Vendas = ({ usuarioLogado }) => {
             <div className="card shark-page-card border-left-info mb-5">
                 <div className="card-body p-4">
                     <div className="row g-3 align-items-end mb-4 border-bottom border-secondary pb-4">
-                        <div className="col-md-4 position-relative">
+                        <div className="col-12 col-md-4 position-relative">
                             <label className="text-info small fw-bold text-uppercase">Localizar Produto</label>
                             <input ref={inputBuscaRef} type="text" className="form-control bg-black text-white p-3"
                                    value={termoBusca} onChange={(e) => buscarProdutos(e.target.value)}
@@ -238,24 +238,24 @@ const Vendas = ({ usuarioLogado }) => {
                                 </div>
                             )}
                         </div>
-                        <div className="col-md-2">
+                        <div className="col-12 col-sm-6 col-md-2">
                             <label className="text-info small fw-bold">PREÇO UN.</label>
                             <input type="number" className="form-control bg-black text-white p-3" value={precoUn} onChange={e => setPrecoUn(e.target.value)} />
                         </div>
-                        <div className="col-md-2">
+                        <div className="col-12 col-sm-6 col-md-2">
                             <label className="text-info small fw-bold">DESC. (%)</label>
                             <input type="number" className="form-control bg-black text-white p-3" value={desconto} onChange={e => setDesconto(e.target.value)} />
                         </div>
-                        <div className="col-md-2">
+                        <div className="col-12 col-sm-6 col-md-2">
                             <label className="text-info small fw-bold">QTD</label>
                             <input type="number" className="form-control bg-black text-white p-3" value={quantidade} onChange={e => setQuantidade(parseInt(e.target.value) || 1)} />
                         </div>
-                        <div className="col-md-2">
+                        <div className="col-12 col-md-2">
                             <button type="button" className="btn btn-shark-primary w-100 p-3" onClick={adicionarAoCarrinho}>INCLUIR</button>
                         </div>
                     </div>
 
-                    <div className="table-responsive" style={{ minHeight: '150px' }}>
+                    <div className="table-responsive shark-mobile-cards" style={{ minHeight: '150px' }}>
                         <table className="table table-dark table-hover">
                             <thead className="bg-black text-white-50 small">
                             <tr>
@@ -271,13 +271,13 @@ const Vendas = ({ usuarioLogado }) => {
                             <tbody>
                             {itensCarrinho.map((it, idx) => (
                                 <tr key={idx} className="align-middle">
-                                    <td className="ps-4">#{it.produtoId}</td>
-                                    <td>{it.nome}</td>
-                                    <td className="text-center">{it.qtd}</td>
-                                    <td>R$ {it.precoOriginal.toFixed(2)}</td>
-                                    <td className="text-danger">-{it.desconto}%</td>
-                                    <td className="text-success fw-bold">R$ {it.subtotal.toFixed(2)}</td>
-                                    <td className="text-center">
+                                    <td className="ps-4" data-label="Código">#{it.produtoId}</td>
+                                    <td data-label="Descrição">{it.nome}</td>
+                                    <td className="text-center" data-label="Qtd">{it.qtd}</td>
+                                    <td data-label="Unitário">R$ {it.precoOriginal.toFixed(2)}</td>
+                                    <td className="text-danger" data-label="Desc.">-{it.desconto}%</td>
+                                    <td className="text-success fw-bold" data-label="Subtotal">R$ {it.subtotal.toFixed(2)}</td>
+                                    <td className="text-center" data-label="Ação">
                                         <button className="btn btn-sm btn-outline-danger border-0" onClick={() => removerItem(idx)}>
                                             <i className="bi bi-trash"></i>
                                         </button>
@@ -288,12 +288,12 @@ const Vendas = ({ usuarioLogado }) => {
                         </table>
                     </div>
 
-                    <div className="d-flex justify-content-between align-items-center mt-4">
+                    <div className="d-flex justify-content-between align-items-center mt-4 shark-pdv-footer">
                         <div>
                             <span className="text-white-50 small text-uppercase">Total da Venda</span>
-                            <h1 className="pdv-total-display fw-bold">R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h1>
+                            <h1 className="pdv-total-display fw-bold shark-pdv-total">R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h1>
                         </div>
-                        <div className="d-flex gap-3">
+                        <div className="d-flex gap-3 shark-pdv-actions">
                             <button type="button" className="btn btn-shark-secondary btn-lg px-4" onClick={() => setItensCarrinho([])}>LIMPAR</button>
                             <button type="button" className="btn btn-success btn-lg px-5 fw-bold" onClick={finalizarVenda}>FINALIZAR (F2)</button>
                         </div>
@@ -302,20 +302,20 @@ const Vendas = ({ usuarioLogado }) => {
             </div>
 
             <div className="row g-2 align-items-end mb-3">
-                <div className="col-md-3"><h4>Histórico de Vendas</h4></div>
-                <div className="col-md-2">
+                <div className="col-12 col-md-3"><h4 className="shark-page-title fs-5 mb-0 text-white">Histórico de Vendas</h4></div>
+                <div className="col-12 col-sm-6 col-md-2">
                     <input className="form-control input-busca-venda" placeholder="ID #" value={filtros.id} onChange={e => setFiltros({...filtros, id: e.target.value})} />
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <input className="form-control input-busca-venda" placeholder="Operador..." value={filtros.vendedor} onChange={e => setFiltros({...filtros, vendedor: e.target.value})} />
                 </div>
-                <div className="col-md-3">
+                <div className="col-12 col-sm-6 col-md-3">
                     <input type="date" className="form-control input-busca-venda" value={filtros.data} onChange={e => setFiltros({...filtros, data: e.target.value})} />
                 </div>
             </div>
 
             <div className="card bg-dark border-0 rounded-4 overflow-hidden">
-                <div className="table-responsive">
+                <div className="table-responsive shark-mobile-cards">
                     <table className="table table-dark table-hover mb-0">
                         <thead className="bg-black text-white-50 small">
                         <tr>
@@ -332,20 +332,20 @@ const Vendas = ({ usuarioLogado }) => {
                         ) : (
                         vendasHistorico.map(v => (
                             <tr key={v.id} className="align-middle">
-                                <td className="ps-4">
+                                <td className="ps-4" data-label="Data / ID">
                                     <div className="fw-bold">{new Date(v.dataHora).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</div>
                                     <div className="text-info small">#{v.id}</div>
                                 </td>
-                                <td><span className="badge bg-black border border-secondary">{v.vendedor?.nome || 'SISTEMA'}</span></td>
-                                <td>
+                                <td data-label="Operador"><span className="badge bg-black border border-secondary">{v.vendedor?.nome || 'SISTEMA'}</span></td>
+                                <td data-label="Produtos">
                                     {v.itens.map((item, idx) => (
                                         <div key={idx} className="historico-item-linha small">
                                             <span className="text-info fw-bold">#{item.produto.id}</span> {item.produto.nome} (x{item.quantidade})
                                         </div>
                                     ))}
                                 </td>
-                                <td className="text-success fw-bold">R$ {v.valorTotal.toFixed(2)}</td>
-                                <td className="text-center">
+                                <td className="text-success fw-bold" data-label="Total">R$ {v.valorTotal.toFixed(2)}</td>
+                                <td className="text-center" data-label="Ações">
                                     <button className="btn btn-sm btn-outline-info border-0"><i className="bi bi-printer"></i></button>
                                     {podeEstorno && <button className="btn btn-sm btn-outline-danger border-0"><i className="bi bi-arrow-counterclockwise"></i></button>}
                                 </td>

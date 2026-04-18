@@ -152,7 +152,7 @@ function RegistroEmpresa() {
             <div className="login-card" style={{ maxWidth: '500px' }}>
                 <div className="text-center mb-4">
                     <img src="/images/logo.png" alt="Shark" style={{ width: '160px', filter: 'drop-shadow(0 0 5px rgba(0,212,255,0.3))' }} />
-                    <h5 className="mt-3" style={{ color: 'var(--shark-light-blue)', fontWeight: 800 }}>CADASTRO DE EMPRESA</h5>
+                    <h5 className="shark-page-title mt-3" style={{ color: 'var(--shark-light-blue)', fontWeight: 800 }}>CADASTRO DE EMPRESA</h5>
                 </div>
 
                 <form onSubmit={handleSubmit}>

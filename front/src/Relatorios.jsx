@@ -36,14 +36,14 @@ const Relatorios = ({ usuarioLogado }) => {
     return (
         <div className="mt-2 text-white">
             {/* HEADER */}
-            <div className="d-flex justify-content-between align-items-center mb-4 d-print-none">
-                <div>
-                    <h2 className="fw-bold mb-0">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4 d-print-none">
+                <div className="w-100 w-md-auto">
+                    <h2 className="shark-page-title fw-bold mb-0">
                         <i className="bi bi-graph-up-arrow text-success glow-success me-2"></i> Relatórios Shark
                     </h2>
                     <p className="text-white-50 small">Análise de performance e fechamento financeiro</p>
                 </div>
-                <button onClick={handlePrint} className="btn btn-outline-info fw-bold shadow-sm">
+                <button onClick={handlePrint} className="btn btn-outline-info fw-bold shadow-sm align-self-stretch align-self-md-center">
                     <i className="bi bi-printer me-2"></i>Imprimir Relatório
                 </button>
             </div>
@@ -173,7 +173,7 @@ const Relatorios = ({ usuarioLogado }) => {
                     {/* TABELAS DE DETALHES */}
                     <h5 className="fw-bold mb-3 text-success">Histórico de Vendas</h5>
                     <div className="shark-table-card mb-5" style={{ borderLeftColor: '#198754' }}>
-                        <div className="table-responsive">
+                        <div className="table-responsive shark-mobile-cards">
                             <table className="table table-dark table-hover mb-0">
                                 <thead className="bg-black text-white-50 text-uppercase small">
                                     <tr>
@@ -187,17 +187,17 @@ const Relatorios = ({ usuarioLogado }) => {
                                 <tbody>
                                     {dados.vendas?.map(v => (
                                         <tr key={v.id} className="align-middle">
-                                            <td className="ps-3 fw-bold text-success">#{v.id}</td>
-                                            <td>{new Date(v.dataHora).toLocaleString('pt-BR')}</td>
-                                            <td>{v.vendedor}</td>
-                                            <td>
+                                            <td className="ps-3 fw-bold text-success" data-label="ID venda">#{v.id}</td>
+                                            <td data-label="Data/hora">{new Date(v.dataHora).toLocaleString('pt-BR')}</td>
+                                            <td data-label="Vendedor">{v.vendedor}</td>
+                                            <td data-label="Produtos">
                                                 {v.itens?.map((it, idx) => (
                                                     <span key={idx} className="badge bg-dark border border-secondary me-1">
                                                         {it.produto?.nome} (x{it.quantidade})
                                                     </span>
                                                 ))}
                                             </td>
-                                            <td className="text-end pe-3 text-success fw-bold">R$ {fmt(v.valorTotal)}</td>
+                                            <td className="text-end pe-3 text-success fw-bold" data-label="Total">R$ {fmt(v.valorTotal)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

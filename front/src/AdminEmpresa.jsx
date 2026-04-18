@@ -284,7 +284,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
         <div className="mt-2 text-white pb-5">
             <div className="mb-4">
                 <div>
-                    <h2 className="fw-bold"><i className="bi bi-building text-info me-2"></i> Painel da empresa</h2>
+                    <h2 className="shark-page-title fw-bold"><i className="bi bi-building text-info me-2"></i> Painel da empresa</h2>
                     <p className="text-white-50 small mb-0">Equipe, comissões, assinatura e dados da unidade.</p>
                 </div>
             </div>
@@ -295,17 +295,17 @@ const AdminEmpresa = ({ usuarioLogado }) => {
             )}
 
             <div className="card-ganhos-stats border-left-info p-4 mb-4" style={{ background: 'var(--shark-gradient-info)' }}>
-                <div className="row align-items-center text-center text-md-start">
+                <div className="row align-items-center text-center text-md-start g-3">
                     <div className="col-md-1 d-none d-md-block text-center"><i className="bi bi-building-fill-check text-info fs-1"></i></div>
-                    <div className="col-md-3 border-end border-secondary border-opacity-25 ps-4">
+                    <div className="col-12 col-md-3 border-end border-secondary border-opacity-25 ps-md-4">
                         <span className="label-mini text-info">Unidade</span>
                         <div className="fw-bold fs-5">{empresa?.nome || 'Shark'}</div>
                     </div>
-                    <div className="col-md-2 border-end border-secondary border-opacity-25">
+                    <div className="col-12 col-sm-6 col-md-2 border-end border-secondary border-opacity-25">
                         <span className="label-mini">CNPJ</span>
                         <div className="text-white-50 val-mono small">{formatCnpj(empresa?.cnpj)}</div>
                     </div>
-                    <div className="col-md-2 border-end border-secondary border-opacity-25">
+                    <div className="col-12 col-sm-6 col-md-2 border-end border-secondary border-opacity-25">
                         <span className="label-mini">WhatsApp</span>
                         {String(empresa?.whatsapp || '').replace(/\D/g, '').length >= 10 ? (
                             <a
@@ -320,13 +320,13 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                             <div className="text-white-50 val-mono small">{formatWhatsapp(empresa?.whatsapp)}</div>
                         )}
                     </div>
-                    <div className="col-md-2 border-end border-secondary border-opacity-25">
+                    <div className="col-12 col-sm-6 col-md-2 border-end border-secondary border-opacity-25">
                         <span className="label-mini">Assinatura</span>
                         <div className="text-warning fw-bold val-mono" style={{fontSize: '0.7rem'}}>
                             {empresa?.diasRestantes || 0} DIAS RESTANTES
                         </div>
                     </div>
-                    <div className="col-md-2 d-flex flex-column gap-2 ps-4">
+                    <div className="col-12 col-md-2 d-flex flex-column gap-2 ps-md-4">
                         <button type="button" className="btn btn-sm btn-warning fw-bold text-dark w-100" onClick={abrirModalRenovar}>RENOVAR AGORA</button>
                         <button type="button" className="btn btn-sm btn-outline-info fw-bold w-100" onClick={abrirModalInfo}>EDITAR INFORMAÇÕES</button>
                     </div>
@@ -334,19 +334,19 @@ const AdminEmpresa = ({ usuarioLogado }) => {
             </div>
 
             <div className="row g-3 mb-4">
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card-ganhos-stats border-left-info text-center">
                         <span className="label-mini">Faturamento Bruto</span>
                         <div className="val-mono fs-4">{formatarMoeda(stats.bruto)}</div>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card-ganhos-stats border-left-success text-center">
                         <span className="label-mini">Comissões Pendentes</span>
                         <div className="val-mono fs-4 text-success">{formatarMoeda(stats.pendente)}</div>
                     </div>
                 </div>
-                <div className="col-md-4">
+                <div className="col-12 col-md-4">
                     <div className="card-ganhos-stats border-left-warning text-center">
                         <span className="label-mini">Equipe Ativa</span>
                         <div className="val-mono fs-4">{stats.total}</div>
@@ -355,7 +355,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
             </div>
 
             <div className="shark-card border-left-info shadow-lg mb-5 overflow-hidden p-0">
-                <div className="table-responsive">
+                <div className="table-responsive shark-mobile-cards">
                     <table className="table table-dark table-hover mb-0 align-middle text-center">
                         <thead>
                         <tr>
@@ -377,24 +377,24 @@ const AdminEmpresa = ({ usuarioLogado }) => {
 
                             return (
                                 <tr key={u.id}>
-                                    <td className="ps-4 text-start">
+                                    <td className="ps-4 text-start" data-label="Colaborador">
                                         <div className="fw-bold text-white">{u.nome}</div>
                                         {u.isRoot && <span className="badge-proprietario ms-1">ROOT</span>}
                                         {!u.aprovado && <span className="badge bg-warning text-dark fw-bold ms-1" style={{fontSize: '0.6rem'}}>PENDENTE</span>}
                                     </td>
-                                    <td className="small text-white-50">
+                                    <td className="small text-white-50" data-label="Taxas">
                                         <div>Taxa OS: {Number(u.comissaoOs) || 0}%</div>
                                         <div>Taxa Vendas: {Number(u.comissaoVenda) || 0}%</div>
                                     </td>
-                                    <td className="val-mono small text-white-50">
+                                    <td className="val-mono small text-white-50" data-label="Bruto">
                                         <div>🛠️ {formatarMoeda(brutoOs)}</div>
                                         <div>🛒 {formatarMoeda(brutoVenda)}</div>
                                     </td>
-                                    <td className="val-mono">
+                                    <td className="val-mono" data-label="Líquido">
                                         <div className="text-success" style={{fontSize: '0.85rem'}}>🛠️ {formatarMoeda(liqOs)}</div>
                                         <div className="text-info" style={{fontSize: '0.85rem'}}>🛒 {formatarMoeda(liqVenda)}</div>
                                     </td>
-                                    <td>
+                                    <td data-label="Ação">
                                         {!u.aprovado ? (
                                             <button className="btn btn-sm btn-info fw-bold w-100" onClick={() => aprovarMutation.mutate(u.id)}>ACEITAR</button>
                                         ) : saldoTotal > 0.01 ? (
@@ -404,7 +404,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                                             </div>
                                         ) : <span className="text-success small fw-bold">ZERADO</span>}
                                     </td>
-                                    <td className="pe-4 text-end">
+                                    <td className="pe-4 text-end" data-label="Ajustes">
                                         <div className="btn-group gap-1">
                                             <button type="button" className="btn btn-sm btn-outline-info" onClick={() => abrirModalComissao(u)}>
                                                 <i className="bi bi-gear-fill"></i>
@@ -437,7 +437,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                 <div className="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
                     <h5 className="fw-bold text-white mb-0 small text-uppercase">Movimentações Recentes</h5>
                 </div>
-                <div className="table-responsive">
+                <div className="table-responsive shark-mobile-cards">
                     <table className="table table-dark table-sm mb-0 align-middle text-center">
                         <thead className="text-muted">
                         <tr>
@@ -450,10 +450,10 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                         <tbody>
                         {pagamentos.slice(0, 10).map(p => (
                             <tr key={p.id}>
-                                <td className="ps-4 text-white-50 val-mono small text-start">{new Date(p.dataHora).toLocaleString('pt-BR')}</td>
-                                <td className="text-white">{p.funcionarioNome}</td>
-                                <td><span className={`badge ${p.tipoComissao === 'VENDA' ? 'bg-info text-dark' : 'bg-success text-white'}`}>{p.tipoComissao}</span></td>
-                                <td className="pe-4 text-end text-success fw-bold val-mono">{formatarMoeda(p.valorPago)}</td>
+                                <td className="ps-4 text-white-50 val-mono small text-start" data-label="Data">{new Date(p.dataHora).toLocaleString('pt-BR')}</td>
+                                <td className="text-white" data-label="Recebedor">{p.funcionarioNome}</td>
+                                <td data-label="Tipo"><span className={`badge ${p.tipoComissao === 'VENDA' ? 'bg-info text-dark' : 'bg-success text-white'}`}>{p.tipoComissao}</span></td>
+                                <td className="pe-4 text-end text-success fw-bold val-mono" data-label="Valor">{formatarMoeda(p.valorPago)}</td>
                             </tr>
                         ))}
                         </tbody>

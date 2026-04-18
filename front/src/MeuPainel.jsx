@@ -51,7 +51,7 @@ const MeuPainel = ({ usuarioLogado }) => {
             <div className="row mb-4">
                 <div className="col-12">
                     <div>
-                        <h2 className="fw-bold text-white mb-1"><i className="bi bi-person-badge me-2" style={{ color: '#0dcaf0' }}></i> Meu painel</h2>
+                        <h2 className="shark-page-title fw-bold text-white mb-1"><i className="bi bi-person-badge me-2" style={{ color: '#0dcaf0' }}></i> Meu painel</h2>
                         <p className="text-white-50 small mb-0">Seus dados, comissões de vendas e O.S., pagamentos recebidos e histórico — tudo em um só lugar.</p>
                     </div>
                 </div>
@@ -152,7 +152,7 @@ const MeuPainel = ({ usuarioLogado }) => {
 
             <div className="tab-content pb-5">
                 {abaAtiva === 'vendas' && (
-                    <div className="table-responsive">
+                    <div className="table-responsive shark-mobile-cards">
                         <table className="table table-dark table-hover align-middle mb-0">
                             <thead className="bg-black small text-muted">
                             <tr>
@@ -165,10 +165,10 @@ const MeuPainel = ({ usuarioLogado }) => {
                             <tbody>
                             {listaVendas.map(v => (
                                 <tr key={v.id}>
-                                    <td className="ps-4 text-white-50 val-mono">{formatarData(v.dataHora)}</td>
-                                    <td className="text-info fw-bold">#V{v.id}</td>
-                                    <td className="val-mono">{formatarMoeda(v.valorTotal)}</td>
-                                    <td className="pe-4 text-end fw-bold text-info val-mono">{formatarMoeda(v.comissaoVendedorValor)}</td>
+                                    <td className="ps-4 text-white-50 val-mono" data-label="Data">{formatarData(v.dataHora)}</td>
+                                    <td className="text-info fw-bold" data-label="Código">#V{v.id}</td>
+                                    <td className="val-mono" data-label="Valor bruto">{formatarMoeda(v.valorTotal)}</td>
+                                    <td className="pe-4 text-end fw-bold text-info val-mono" data-label="Sua comissão">{formatarMoeda(v.comissaoVendedorValor)}</td>
                                 </tr>
                             ))}
                             </tbody>
@@ -177,7 +177,7 @@ const MeuPainel = ({ usuarioLogado }) => {
                 )}
 
                 {abaAtiva === 'servicos' && (
-                    <div className="table-responsive">
+                    <div className="table-responsive shark-mobile-cards">
                         <table className="table table-dark table-hover align-middle mb-0">
                             <thead className="bg-black small text-muted">
                             <tr>
@@ -193,11 +193,11 @@ const MeuPainel = ({ usuarioLogado }) => {
                                 const comissao = os.comissaoTecnicoValor ?? 0;
                                 return (
                                     <tr key={os.id}>
-                                        <td className="ps-4 text-white-50 val-mono">{formatarData(os.dataPronto || os.data)}</td>
-                                        <td className="text-success fw-bold">#{os.id}</td>
-                                        <td>{os.produto}</td>
-                                        <td className="pe-4 text-end fw-bold text-success val-mono">{formatarMoeda(comissao)}</td>
-                                        <td className="pe-4 text-end">
+                                        <td className="ps-4 text-white-50 val-mono" data-label="Data">{formatarData(os.dataPronto || os.data)}</td>
+                                        <td className="text-success fw-bold" data-label="O.S.">#{os.id}</td>
+                                        <td data-label="Produto / serviço">{os.produto}</td>
+                                        <td className="pe-4 text-end fw-bold text-success val-mono" data-label="Sua comissão">{formatarMoeda(comissao)}</td>
+                                        <td className="pe-4 text-end" data-label="Ações">
                                             <button className="btn btn-sm btn-outline-info" onClick={() => imprimirOS(os.id)}>
                                                 PDF
                                             </button>
@@ -211,7 +211,7 @@ const MeuPainel = ({ usuarioLogado }) => {
                 )}
 
                 {abaAtiva === 'pagamentos' && (
-                    <div className="table-responsive">
+                    <div className="table-responsive shark-mobile-cards">
                         <table className="table table-dark table-hover align-middle mb-0">
                             <thead className="bg-black small text-muted">
                             <tr>
@@ -224,14 +224,14 @@ const MeuPainel = ({ usuarioLogado }) => {
                             <tbody>
                             {listaPagamentos.map(p => (
                                 <tr key={p.id}>
-                                    <td className="ps-4 text-white-50 val-mono">{formatarData(p.dataHora)}</td>
-                                    <td className="fw-bold text-success val-mono">{formatarMoeda(p.valorPago)}</td>
-                                    <td className="text-center">
+                                    <td className="ps-4 text-white-50 val-mono" data-label="Data">{formatarData(p.dataHora)}</td>
+                                    <td className="fw-bold text-success val-mono" data-label="Valor pago">{formatarMoeda(p.valorPago)}</td>
+                                    <td className="text-center" data-label="Tipo">
                                             <span className={`badge bg-dark border ${p.tipoComissao === 'VENDA' ? 'border-info text-info' : 'border-success text-success'}`}>
                                                 {p.tipoComissao}
                                             </span>
                                     </td>
-                                    <td className="pe-4 text-end text-white-50 small">{p.responsavelPagamento}</td>
+                                    <td className="pe-4 text-end text-white-50 small" data-label="Responsável">{p.responsavelPagamento}</td>
                                 </tr>
                             ))}
                             </tbody>

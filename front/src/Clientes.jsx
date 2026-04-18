@@ -152,9 +152,9 @@ const Clientes = ({ usuarioLogado }) => {
 
     return (
         <div className="mt-2">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h2 className="fw-bold mb-0 text-white">
+            <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4">
+                <div className="w-100 w-md-auto">
+                    <h2 className="shark-page-title fw-bold mb-0 text-white">
                         <i className="bi bi-people-fill glow-info" style={{ color: '#0dcaf0' }}></i> Gestão de Clientes
                     </h2>
                     <p className="text-white-50 small">Administração de cadastros da Shark Eletrônicos | Brasília-DF</p>
@@ -177,13 +177,13 @@ const Clientes = ({ usuarioLogado }) => {
                 </div>
                 <div className="card-body p-4">
                     <form onSubmit={handleSubmit} className="row g-3">
-                        <div className="col-md-5">
+                        <div className="col-12 col-md-5">
                             <label className="form-label text-info small fw-bold mb-1 text-uppercase">Nome Completo</label>
                             <input name="nome" value={formData.nome} onChange={handleInputChange}
                                    className="form-control bg-black text-white border-secondary shadow-none p-2"
                                    placeholder="Digite para cadastrar ou filtrar a lista..." required minLength="5" />
                         </div>
-                        <div className="col-md-3">
+                        <div className="col-12 col-md-3">
                             <label className="form-label text-info small fw-bold mb-1 text-uppercase">CPF</label>
                             <input name="cpf" value={formData.cpf} onChange={handleInputChange}
                                    className={`form-control bg-black text-white border-secondary shadow-none p-2 ${isDuplicado || (formData.cpf && formData.cpf.replace(/\D/g, '').length !== 11) ? 'is-invalid-shark' : ''}`}
@@ -192,9 +192,9 @@ const Clientes = ({ usuarioLogado }) => {
                                 <span className="warning-text"><i className="bi bi-info-circle"></i> Requer 11 números</span>
                             )}
                         </div>
-                        <div className="col-md-4">
+                        <div className="col-12 col-md-4">
                             <label className="form-label text-info small fw-bold mb-1 text-uppercase">WhatsApp</label>
-                            <div className="d-flex gap-2">
+                            <div className="d-flex flex-column flex-sm-row gap-2">
                                 <div className="flex-grow-1">
                                     <input name="whatsapp" value={formData.whatsapp} onChange={handleInputChange}
                                            className={`form-control bg-black text-white border-secondary shadow-none p-2 ${isDuplicado || (formData.whatsapp && formData.whatsapp.replace(/\D/g, '').length !== 11) ? 'is-invalid-shark' : ''}`}
@@ -203,11 +203,11 @@ const Clientes = ({ usuarioLogado }) => {
                                         <span className="warning-text"><i className="bi bi-info-circle"></i> Requer 11 números</span>
                                     )}
                                 </div>
-                                <button type="submit" disabled={isDuplicado || dadosIncompletos} className="btn btn-shark-primary fw-bold px-3 align-self-start">SALVAR</button>
+                                <button type="submit" disabled={isDuplicado || dadosIncompletos} className="btn btn-shark-primary fw-bold px-3 align-self-stretch align-self-sm-start">SALVAR</button>
                             </div>
                         </div>
 
-                        <div className="col-12 mt-3 d-flex justify-content-between align-items-center">
+                        <div className="col-12 mt-3 d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2">
                             <button type="button" className="btn btn-sm btn-outline-secondary fw-bold" onClick={limparForm}>
                                 <i className="bi bi-eraser me-2"></i> Limpar Campos
                             </button>
@@ -222,7 +222,7 @@ const Clientes = ({ usuarioLogado }) => {
             </div>
 
             <div className="card bg-dark border-0 shadow-sm overflow-hidden mb-2" style={{ borderRadius: '15px', borderLeft: '5px solid #0dcaf0' }}>
-                <div className="table-responsive">
+                <div className="table-responsive shark-mobile-cards">
                     <table className="table table-hover table-dark mb-0">
                         <thead className="bg-black text-muted small text-uppercase">
                         <tr>
@@ -239,17 +239,17 @@ const Clientes = ({ usuarioLogado }) => {
                         ) : (
                             clientes.map(c => (
                                 <tr key={c.id} className="align-middle">
-                                    <td className="ps-4 fw-bold text-info">#{c.id}</td>
-                                    <td className="fw-bold text-white">{c.nome}</td>
-                                    <td>{c.cpf}</td>
-                                    <td>
+                                    <td className="ps-4 fw-bold text-info" data-label="ID">#{c.id}</td>
+                                    <td className="fw-bold text-white" data-label="Nome">{c.nome}</td>
+                                    <td data-label="CPF">{c.cpf}</td>
+                                    <td data-label="Contato">
                                         <a href={`https://wa.me/55${c.whatsapp.replace(/\D/g, '')}`}
                                            target="_blank" rel="noreferrer" className="text-success text-decoration-none fw-bold btn-link-shark">
                                             <i className="bi bi-whatsapp"></i> {c.whatsapp}
                                         </a>
                                     </td>
-                                    <td className="text-center pe-4">
-                                        <div className="d-flex justify-content-center gap-2">
+                                    <td className="text-center pe-4" data-label="Ações">
+                                        <div className="d-flex justify-content-center justify-content-md-center gap-2 flex-wrap">
                                             <button type="button" onClick={() => handleEditar(c)}
                                                     className={`btn btn-sm btn-outline-info ${!podeEditarExcluir ? 'btn-readonly' : ''}`}>
                                                 <i className="bi bi-pencil-square"></i>

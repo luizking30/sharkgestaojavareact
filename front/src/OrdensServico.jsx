@@ -223,12 +223,12 @@ const OrdensServico = ({ usuarioLogado }) => {
 
     return (
         <div className="mt-2">
-            <h2 className="fw-bold text-white mb-4"><i className="bi bi-tools glow-info" style={{ color: '#0dcaf0' }}></i> Ordens de Serviço</h2>
+            <h2 className="shark-page-title fw-bold text-white mb-4"><i className="bi bi-tools glow-info" style={{ color: '#0dcaf0' }}></i> Ordens de Serviço</h2>
 
             <div className="card shark-page-card border-left-info mb-4">
                 <div className="card-body p-4">
                     <form onSubmit={handleSalvarOS} className="row g-3">
-                        <div className="col-md-3 position-relative">
+                        <div className="col-12 col-md-3 position-relative">
                             <label className="text-info small fw-bold text-uppercase">Cliente</label>
                             <input type="text" className="form-control bg-black text-white border-secondary"
                                    value={formData.clienteNome}
@@ -248,24 +248,24 @@ const OrdensServico = ({ usuarioLogado }) => {
                                 </div>
                             )}
                         </div>
-                        <div className="col-md-2">
+                        <div className="col-12 col-md-2">
                             <label className="text-info small fw-bold">EQUIPAMENTO</label>
                             <input className="form-control bg-black text-white border-secondary"
                                    value={formData.produto} onChange={e => setFormData({...formData, produto: e.target.value})} required />
                         </div>
-                        <div className="col-md-2">
+                        <div className="col-12 col-md-2">
                             <label className="text-info small fw-bold">DEFEITO</label>
                             <input className="form-control bg-black text-white border-secondary"
                                    value={formData.defeito} onChange={e => setFormData({...formData, defeito: e.target.value})} required />
                         </div>
-                        <div className="col-md-1">
+                        <div className="col-12 col-sm-6 col-md-1">
                             <label className="text-info small fw-bold">VALOR</label>
                             <input type="number" step="0.01" className="form-control bg-black text-white border-secondary"
                                    value={formData.valor} onChange={e => setFormData({...formData, valor: e.target.value})}
                                    placeholder="Opcional" />
                         </div>
-                        <div className="col-md-2 d-flex align-items-end">
-                            <button type="submit" className="btn btn-shark-primary w-100 p-2">SALVAR O.S.</button>
+                        <div className="col-12 col-md-2 d-flex align-items-stretch align-items-md-end">
+                            <button type="submit" className="btn btn-shark-primary w-100 p-2 mt-1 mt-md-0">SALVAR O.S.</button>
                         </div>
                     </form>
                 </div>
@@ -273,19 +273,19 @@ const OrdensServico = ({ usuarioLogado }) => {
 
             <div className="card shark-page-card border-left-info mb-4">
                 <div className="card-body row g-2">
-                    <div className="col-md-1">
+                    <div className="col-12 col-sm-6 col-md-1">
                         <input type="text" className="form-control bg-black text-white border-secondary" placeholder="ID #"
                                value={filtros.id} onChange={e => setFiltros({...filtros, id: e.target.value})} />
                     </div>
-                    <div className="col-md-4">
+                    <div className="col-12 col-md-4">
                         <input type="text" className="form-control bg-black text-white border-secondary" placeholder="Filtrar Cliente..."
                                value={filtros.nome} onChange={e => setFiltros({...filtros, nome: e.target.value})} />
                     </div>
-                    <div className="col-md-3">
+                    <div className="col-12 col-sm-6 col-md-3">
                         <input type="date" className="form-control bg-black text-white border-secondary"
                                value={filtros.data} onChange={e => setFiltros({...filtros, data: e.target.value})} />
                     </div>
-                    <div className="col-md-3">
+                    <div className="col-12 col-sm-6 col-md-3">
                         <select className="form-select bg-black text-white border-secondary"
                                 value={filtros.status} onChange={e => setFiltros({...filtros, status: e.target.value})}>
                             <option value="">Todos Status</option>
@@ -295,7 +295,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                             <option value="Entregue">Entregue</option>
                         </select>
                     </div>
-                    <div className="col-md-1">
+                    <div className="col-12 col-md-1">
                         <button className="btn btn-outline-info w-100" onClick={() => setFiltros({id:'', nome:'', data:'', status:''})}>
                             <i className="bi bi-eraser"></i>
                         </button>
@@ -304,7 +304,7 @@ const OrdensServico = ({ usuarioLogado }) => {
             </div>
 
             <div className="card bg-dark border-0 overflow-hidden" style={{ borderRadius: '15px' }}>
-                <div className="table-responsive">
+                <div className="table-responsive shark-mobile-cards">
                     <table className="table table-hover table-dark align-middle">
                         <thead className="bg-black text-white-50 small">
                         <tr>
@@ -322,7 +322,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                         ) : (
                         ordens.map(o => (
                             <tr key={o.id}>
-                                <td className="ps-4">
+                                <td className="ps-4" data-label="ID / Datas">
                                     <span className="fw-bold text-info">#{o.id}</span>
                                     <div className="small text-muted mt-1" style={{fontSize: '0.7rem'}}>
                                         Aberto por: {o.funcionarioAbertura} <br/>
@@ -344,17 +344,17 @@ const OrdensServico = ({ usuarioLogado }) => {
                                         )}
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Cliente">
                                     <div className="fw-bold">{o.clienteNome}</div>
                                     <a href={`https://wa.me/55${o.clienteWhatsapp?.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-success text-decoration-none small">
                                         <i className="bi bi-whatsapp me-1"></i>{o.clienteWhatsapp}
                                     </a>
                                 </td>
-                                <td>
+                                <td data-label="Equipamento">
                                     <span className="text-white">{o.produto}</span><br/>
                                     <small className="text-info">{o.defeito}</small>
                                 </td>
-                                <td>
+                                <td data-label="Financeiro">
                                     <div className="os-valor-bruto">R$ {o.valorTotal?.toFixed(2)}</div>
                                     {o.custoPeca > 0 && (
                                         <>
@@ -363,7 +363,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                                         </>
                                     )}
                                 </td>
-                                <td>
+                                <td data-label="Status">
                                         <span className={`badge mb-1 d-block ${o.status === 'Em análise' ? 'bg-warning text-dark' : o.status === 'Em andamento' ? 'bg-primary' : o.status === 'Pronto' ? 'bg-info text-dark' : 'bg-success'}`}>
                                             {o.status}
                                         </span>
@@ -376,8 +376,8 @@ const OrdensServico = ({ usuarioLogado }) => {
                                         <option value="Entregue" disabled={naoPodeEntregar && o.status !== 'Entregue'}>Entregue/Pago</option>
                                     </select>
                                 </td>
-                                <td className="text-center">
-                                    <div className="btn-group">
+                                <td className="text-center" data-label="Ações">
+                                    <div className="btn-group flex-wrap">
                                         <button className="btn btn-sm btn-outline-info" onClick={() => imprimirPDF(o.id)}>
                                             <i className="bi bi-file-earmark-pdf"></i>
                                         </button>
