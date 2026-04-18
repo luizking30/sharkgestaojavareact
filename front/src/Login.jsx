@@ -37,9 +37,37 @@ function Login() {
     if (data == null) return '';
     if (typeof data === 'string') return data.trim();
     if (typeof data === 'object') {
-      return String(
-        data.message || data.error || data.title || data.detail || ''
-      ).trim();
+      const pick = (v) => {
+        if (v == null) return '';
+        if (typeof v === 'string') return v.trim();
+        if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+        if (typeof v === 'object') {
+          const inner =
+            v.message ||
+            v.error ||
+            v.detail ||
+            (typeof v.title === 'string' ? v.title : '');
+          if (inner && typeof inner === 'string') return inner.trim();
+          if (Array.isArray(v) && v[0] != null) return pick(v[0]);
+        }
+        return '';
+      };
+      const direct =
+        pick(data.message) ||
+        pick(data.detail) ||
+        pick(data.title) ||
+        (typeof data.error === 'string' ? data.error.trim() : pick(data.error));
+      if (direct) return direct;
+      if (data.errors && typeof data.errors === 'object') {
+        const first = Object.values(data.errors)[0];
+        const fromMap = pick(first);
+        if (fromMap) return fromMap;
+      }
+      try {
+        return JSON.stringify(data);
+      } catch {
+        return '';
+      }
     }
     return '';
   };
@@ -79,6 +107,14 @@ function Login() {
       if (status >= 502 && status <= 504) {
         setErrorMsg(
           'Serviço temporariamente indisponível (gateway). A API pode estar iniciando — aguarde 2–5 minutos e tente novamente.'
+        );
+        return;
+      }
+
+      if (status === 404) {
+        setErrorMsg(
+          'Serviço de login não encontrado (404). Confira se a API está em https://api.sharkgestao.com ' +
+            'e faça um novo deploy do front na Vercel com VITE_API_URL=https://api.sharkgestao.com.'
         );
         return;
       }
@@ -129,8 +165,10 @@ function Login() {
       setIsRecovery(false); // Volta para tela de login com o card de sucesso visível
       setIdentificador('');
     } catch (error) {
-      const msg = error.response?.data;
-      setErrorMsg(typeof msg === 'object' ? msg.message : msg || "ERRO AO LOCALIZAR CONTA");
+      const data = error.response?.data;
+      setErrorMsg(
+        extrairMensagemBackend(data) || (typeof data === 'string' ? data : '') || 'Erro ao localizar conta.'
+      );
     } finally {
       setLoading(false);
     }
