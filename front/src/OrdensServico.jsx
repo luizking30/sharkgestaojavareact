@@ -8,6 +8,7 @@ import { useFeedback } from './context/FeedbackContext';
 import {
     forbidExcluirOrdemServico,
     forbidEntregarOs,
+    normalizeRole,
 } from './auth/accessRules';
 
 const OS_PAGE_SIZE = 15;
@@ -59,7 +60,6 @@ const OrdensServico = ({ usuarioLogado }) => {
     const [formData, setFormData] = useState({
         clienteId: '',
         clienteNome: '',
-        clienteCpf: '---',
         clienteWhatsapp: '---',
         produto: '',
         defeito: '',
@@ -67,6 +67,7 @@ const OrdensServico = ({ usuarioLogado }) => {
     });
 
     const naoPodeEntregar = forbidEntregarOs(usuarioLogado?.role);
+    const naoPodeMarcarPronto = normalizeRole(usuarioLogado?.role) === 'ROLE_VENDEDOR';
     const podeExcluirOs = !forbidExcluirOrdemServico(usuarioLogado?.role);
 
     const debouncedBuscarClientes = useMemo(
@@ -100,7 +101,6 @@ const OrdensServico = ({ usuarioLogado }) => {
             ...formData,
             clienteId: c.id,
             clienteNome: c.nome,
-            clienteCpf: c.cpf || 'Não informado',
             clienteWhatsapp: c.whatsapp || 'Não informado'
         });
         setExibirSugestoes(false);
@@ -110,6 +110,10 @@ const OrdensServico = ({ usuarioLogado }) => {
     const handleStatusChange = async (ordem, novoStatus) => {
         if (novoStatus === 'Entregue' && naoPodeEntregar) {
             notify.warning('Vendedor não pode entregar O.S. Conclua os passos até "Pronto" e um gestor ou técnico fará a entrega.', 'Permissão');
+            return;
+        }
+        if (novoStatus === 'Pronto' && naoPodeMarcarPronto) {
+            notify.warning('Vendedor não pode marcar O.S. como "Pronto".', 'Permissão');
             return;
         }
         const hierarquia = ['Em análise', 'Em andamento', 'Pronto', 'Entregue'];
@@ -126,6 +130,16 @@ const OrdensServico = ({ usuarioLogado }) => {
         }
 
         let custoPeca = 0;
+        let valor = null;
+        if (novoStatus === 'Em andamento' && (!ordem.valorTotal || ordem.valorTotal <= 0)) {
+            const valorResposta = await promptDialog('Informe o valor da O.S. para iniciar o atendimento.', 'Valor da O.S.', '');
+            if (valorResposta === null) return;
+            valor = parseFloat(String(valorResposta).replace(',', '.')) || 0;
+            if (valor <= 0) {
+                notify.warning('Para iniciar em andamento, informe um valor maior que zero.', 'Valor obrigatório');
+                return;
+            }
+        }
         if (novoStatus === 'Entregue') {
             const resposta = await promptDialog('Informe o gasto com peças (use ponto ou vírgula).', 'O.S. entregue', '0.00');
             if (resposta === null) return;
@@ -135,7 +149,8 @@ const OrdensServico = ({ usuarioLogado }) => {
         try {
             await api.put(`/api/ordens/editar-status/${ordem.id}`, {
                 status: novoStatus,
-                custoPeca: custoPeca
+                custoPeca: custoPeca,
+                valor,
             });
 
             // ATUALIZAÇÃO GLOBAL
@@ -199,7 +214,7 @@ const OrdensServico = ({ usuarioLogado }) => {
             queryClient.invalidateQueries({ queryKey: ['ordens-servico'] });
             queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] });
 
-            setFormData({ clienteId: '', clienteNome: '', clienteCpf: '---', clienteWhatsapp: '---', produto: '', defeito: '', valor: '' });
+            setFormData({ clienteId: '', clienteNome: '', clienteWhatsapp: '---', produto: '', defeito: '', valor: '' });
             notify.success('O.S. criada com sucesso.', 'Laboratório');
         } catch (err) {
             notify.error('Erro ao criar a O.S.', 'Erro');
@@ -234,10 +249,6 @@ const OrdensServico = ({ usuarioLogado }) => {
                             )}
                         </div>
                         <div className="col-md-2">
-                            <label className="text-info small fw-bold">CPF</label>
-                            <div className="p-3 bg-dark border rounded text-info fw-bold">{formData.clienteCpf}</div>
-                        </div>
-                        <div className="col-md-2">
                             <label className="text-info small fw-bold">EQUIPAMENTO</label>
                             <input className="form-control bg-black text-white border-secondary"
                                    value={formData.produto} onChange={e => setFormData({...formData, produto: e.target.value})} required />
@@ -250,7 +261,8 @@ const OrdensServico = ({ usuarioLogado }) => {
                         <div className="col-md-1">
                             <label className="text-info small fw-bold">VALOR</label>
                             <input type="number" step="0.01" className="form-control bg-black text-white border-secondary"
-                                   value={formData.valor} onChange={e => setFormData({...formData, valor: e.target.value})} required />
+                                   value={formData.valor} onChange={e => setFormData({...formData, valor: e.target.value})}
+                                   placeholder="Opcional" />
                         </div>
                         <div className="col-md-2 d-flex align-items-end">
                             <button type="submit" className="btn btn-shark-primary w-100 p-2">SALVAR O.S.</button>
@@ -315,6 +327,21 @@ const OrdensServico = ({ usuarioLogado }) => {
                                     <div className="small text-muted mt-1" style={{fontSize: '0.7rem'}}>
                                         Aberto por: {o.funcionarioAbertura} <br/>
                                         Em: {new Date(o.data).toLocaleString('pt-BR')}
+                                        {o.funcionarioAndamento && (
+                                            <>
+                                                <br/>Andamento: {o.funcionarioAndamento} ({new Date(o.dataAndamento).toLocaleString('pt-BR')})
+                                            </>
+                                        )}
+                                        {o.funcionarioPronto && (
+                                            <>
+                                                <br/>Pronto: {o.funcionarioPronto} ({new Date(o.dataPronto).toLocaleString('pt-BR')})
+                                            </>
+                                        )}
+                                        {o.funcionarioEntrega && (
+                                            <>
+                                                <br/>Entregue: {o.funcionarioEntrega} ({new Date(o.dataEntrega).toLocaleString('pt-BR')})
+                                            </>
+                                        )}
                                     </div>
                                 </td>
                                 <td>
@@ -345,7 +372,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                                             onChange={(e) => handleStatusChange(o, e.target.value)}>
                                         <option value="Em análise">Em análise</option>
                                         <option value="Em andamento">Em andamento</option>
-                                        <option value="Pronto">Pronto</option>
+                                        <option value="Pronto" disabled={naoPodeMarcarPronto && o.status !== 'Pronto'}>Pronto</option>
                                         <option value="Entregue" disabled={naoPodeEntregar && o.status !== 'Entregue'}>Entregue/Pago</option>
                                     </select>
                                 </td>

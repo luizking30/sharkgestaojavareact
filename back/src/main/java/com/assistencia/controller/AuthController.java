@@ -2,8 +2,14 @@ package com.assistencia.controller;
 
 import java.util.*;
 import java.time.LocalDateTime;
-import com.assistencia.model.*;
+import com.assistencia.model.Empresa;
+import com.assistencia.model.Usuario;
 import com.assistencia.dto.LoginDTO;
+import com.assistencia.dto.AuthSessionResponseDTO;
+import com.assistencia.dto.EmpresaResponseDTO;
+import com.assistencia.dto.UsuarioRequestDTO;
+import com.assistencia.dto.mapper.EmpresaMapper;
+import com.assistencia.dto.mapper.UsuarioMapper;
 import com.assistencia.repository.UsuarioRepository;
 import com.assistencia.repository.EmpresaRepository;
 import com.assistencia.service.EmailService;
@@ -38,23 +44,30 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginDTO dados) {
-        // 1. 🦈 SHARK SECURITY: Busca o usuário antes de autenticar para checar aprovação
-        Usuario user = usuarioRepository.findByUsername(dados.username())
-                .orElse(null);
+        String login = dados.username() != null ? dados.username().trim() : "";
+        // Login flexível: mesmo campo aceita login, e-mail ou CPF (somente dígitos).
+        Usuario user = usuarioRepository.findByUsername(login).orElse(null);
+        if (user == null && !login.isEmpty()) {
+            user = usuarioRepository.findByEmail(login).orElse(null);
+        }
+        if (user == null && !login.isEmpty()) {
+            String cpf = login.replaceAll("\\D", "");
+            if (cpf.length() >= 11) {
+                user = usuarioRepository.findByCpf(cpf).orElse(null);
+            }
+        }
 
-        // Retorno imediato para usuário inexistente: evita a lentidão da primeira tentativa inválida.
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("Usuário não encontrado!");
         }
 
-        // Se o usuário existir, verificamos se ele já foi aceito pelo dono da loja
         if (!user.isAprovado()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("O proprietário da empresa ainda não aprovou sua conta.");
         }
 
-        UserDetails principal = userDetailsService.loadUserByUsername(dados.username());
+        UserDetails principal = userDetailsService.loadUserByUsername(user.getUsername());
         if (dados.password() == null || !passwordEncoder.matches(dados.password(), principal.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("Senha incorreta!");
@@ -63,51 +76,32 @@ public class AuthController {
         // 3. Se chegou aqui, o usuário existe e a senha está correta
         String token = jwtService.generateToken(principal);
 
-        return ResponseEntity.ok(montarPayloadSessao(user, token));
+        return ResponseEntity.ok(UsuarioMapper.toAuthSession(user, token));
     }
 
     /**
      * Atualiza role/tipo/empresa a partir do banco (evita localStorage desatualizado no front).
      */
     @GetMapping("/me")
-    public ResponseEntity<?> sessaoAtual() {
+    public ResponseEntity<AuthSessionResponseDTO> sessaoAtual() {
         Usuario user = securityUtils.getUsuarioLogado();
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(montarPayloadSessao(user, null));
-    }
-
-    private Map<String, Object> montarPayloadSessao(Usuario user, String token) {
-        Map<String, Object> response = new HashMap<>();
-        if (token != null) {
-            response.put("token", token);
-        }
-        response.put("id", user.getId());
-        response.put("username", user.getUsername());
-        response.put("role", user.getRole());
-        response.put("nome", user.getNome());
-
-        Map<String, Object> empresaMap = new HashMap<>();
-        empresaMap.put("id", user.getEmpresa().getId());
-        empresaMap.put("nome", user.getEmpresa().getNome());
-        empresaMap.put("cnpj", user.getEmpresa().getCnpj());
-        empresaMap.put("whatsapp", user.getEmpresa().getWhatsapp());
-        empresaMap.put("diasRestantes", user.getEmpresa().getDiasRestantes());
-        empresaMap.put("ativo", user.getEmpresa().isAtivo());
-
-        response.put("empresa", empresaMap);
-
-        return response;
+        return ResponseEntity.ok(UsuarioMapper.toAuthSession(user, null));
     }
 
     @GetMapping("/empresas")
-    public ResponseEntity<List<Empresa>> listarEmpresasParaRegistro() {
-        return ResponseEntity.ok(empresaRepository.findAll());
+    public ResponseEntity<List<EmpresaResponseDTO>> listarEmpresasParaRegistro() {
+        List<EmpresaResponseDTO> lista = empresaRepository.findAll().stream()
+                .map(EmpresaMapper::toResponse)
+                .toList();
+        return ResponseEntity.ok(lista);
     }
 
     @PostMapping("/registro-funcionario")
-    public ResponseEntity<?> registrarFuncionario(@RequestBody @Valid Usuario usuario, @RequestParam Long empresaId) {
+    public ResponseEntity<?> registrarFuncionario(@RequestBody @Valid UsuarioRequestDTO dto, @RequestParam Long empresaId) {
+        Usuario usuario = UsuarioMapper.fromRequest(dto);
         Map<String, String> erros = validarDados(usuario);
         if (empresaId == null) erros.put("empresa", "Informação obrigatória");
 
@@ -158,17 +152,18 @@ public class AuthController {
                     salvo.getWhatsapp()
             );
 
-            return ResponseEntity.ok(salvo);
+            return ResponseEntity.ok(UsuarioMapper.toResponse(salvo));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Erro ao registrar: " + e.getMessage());
         }
     }
 
     @PostMapping("/registro-empresa")
-    public ResponseEntity<?> registrarEmpresa(@RequestBody @Valid Usuario usuario,
+    public ResponseEntity<?> registrarEmpresa(@RequestBody @Valid UsuarioRequestDTO dto,
                                               @RequestParam String nomeEmpresa,
                                               @RequestParam(required = false) String cnpj,
                                               @RequestParam(required = false) String whatsappEmpresa) {
+        Usuario usuario = UsuarioMapper.fromRequest(dto);
         log.info("Registro de empresa solicitado: nomeEmpresa='{}', email='{}'", nomeEmpresa, usuario.getEmail());
 
         Map<String, String> erros = validarDados(usuario);

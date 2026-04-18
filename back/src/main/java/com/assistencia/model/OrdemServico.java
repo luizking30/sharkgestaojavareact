@@ -1,7 +1,5 @@
 package com.assistencia.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -26,6 +24,7 @@ public class OrdemServico {
 
     private LocalDateTime data;           // Data de Abertura
     private LocalDateTime dataAndamento;  // Data de Início do Serviço
+    private LocalDateTime dataPronto;     // Data em que entrou em "Pronto"
     private LocalDateTime dataEntrega;    // Data de Finalização/Entrega
 
     private Double valorTotal = 0.0;
@@ -38,18 +37,17 @@ public class OrdemServico {
     // --- CAMPOS DE AUDITORIA (NOMES DOS FUNCIONÁRIOS) ---
     private String funcionarioAbertura;
     private String funcionarioAndamento;
+    private String funcionarioPronto;
     private String funcionarioEntrega;
 
     // Relacionamento com a classe Usuario (O técnico responsável)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tecnico_id")
-    @JsonIgnoreProperties({"password", "empresa", "resetPasswordToken", "tokenExpiration"})
     private Usuario tecnico;
 
     // --- RELACIONAMENTO SaaS (MULTITENANT) ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)
-    @JsonIgnore
     private Empresa empresa;
 
     public OrdemServico() {
@@ -91,6 +89,9 @@ public class OrdemServico {
     public LocalDateTime getDataEntrega() { return dataEntrega; }
     public void setDataEntrega(LocalDateTime dataEntrega) { this.dataEntrega = dataEntrega; }
 
+    public LocalDateTime getDataPronto() { return dataPronto; }
+    public void setDataPronto(LocalDateTime dataPronto) { this.dataPronto = dataPronto; }
+
     public Double getValorTotal() { return valorTotal; }
     public void setValorTotal(Double valorTotal) { this.valorTotal = valorTotal; }
 
@@ -114,6 +115,9 @@ public class OrdemServico {
 
     public String getFuncionarioEntrega() { return funcionarioEntrega; }
     public void setFuncionarioEntrega(String funcionarioEntrega) { this.funcionarioEntrega = funcionarioEntrega; }
+
+    public String getFuncionarioPronto() { return funcionarioPronto; }
+    public void setFuncionarioPronto(String funcionarioPronto) { this.funcionarioPronto = funcionarioPronto; }
 
     public Empresa getEmpresa() { return empresa; }
     public void setEmpresa(Empresa empresa) { this.empresa = empresa; }

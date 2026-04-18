@@ -85,7 +85,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // Produção: front em Vercel; previews *.vercel.app. Dev: Vite :5173 e rede local.
         configuration.setAllowedOriginPatterns(Arrays.asList(
+                "https://sharkgestao.com",
+                "https://www.sharkgestao.com",
+                "https://*.vercel.app",
+                "http://localhost:5173",
                 "http://127.0.0.1:5173",
                 "http://192.168.*:5173",
                 "http://10.*:5173",
@@ -97,8 +102,9 @@ public class SecurityConfig {
                 "http://172.30.*:5173",
                 "http://172.31.*:5173"
         ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

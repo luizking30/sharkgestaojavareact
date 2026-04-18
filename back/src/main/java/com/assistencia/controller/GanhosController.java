@@ -1,6 +1,14 @@
 package com.assistencia.controller;
 
-import com.assistencia.model.*;
+import com.assistencia.model.OrdemServico;
+import com.assistencia.model.PagamentoComissao;
+import com.assistencia.model.Usuario;
+import com.assistencia.model.Venda;
+import com.assistencia.dto.MeuExtratoResponseDTO;
+import com.assistencia.dto.mapper.OrdemServicoMapper;
+import com.assistencia.dto.mapper.PagamentoExtratoMapper;
+import com.assistencia.dto.mapper.UsuarioMapper;
+import com.assistencia.dto.mapper.VendaExtratoMapper;
 import com.assistencia.repository.OrdemServicoRepository;
 import com.assistencia.repository.PagamentoComissaoRepository;
 import com.assistencia.repository.VendaRepository;
@@ -12,7 +20,8 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/usuarios")
@@ -32,7 +41,7 @@ public class GanhosController {
     }
 
     @GetMapping("/meu-extrato")
-    public ResponseEntity<?> meusGanhos() {
+    public ResponseEntity<MeuExtratoResponseDTO> meusGanhos() {
         Usuario usuarioLogado = securityUtils.getUsuarioLogado();
         if (usuarioLogado == null) return ResponseEntity.status(401).build();
 
@@ -66,9 +75,9 @@ public class GanhosController {
                 .map(v -> BigDecimal.valueOf(v.getComissaoVendedorValor() != null ? v.getComissaoVendedorValor() : 0.0))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 3. ORDENS DE SERVIÇO (Filtrado por Técnico e Status 'Entregue' pós-último pagamento)
-        List<OrdemServico> servicosNovos = ordemRepo.findByEmpresaIdAndStatusAndFuncionarioAndamentoIgnoreCaseAndDataEntregaAfter(
-                empresaId, "Entregue", nomeU, corteOs);
+        // 3. ORDENS DE SERVIÇO (Filtrado por Técnico e Status 'Pronto' pós-último pagamento)
+        List<OrdemServico> servicosNovos = ordemRepo.findByEmpresaIdAndStatusAndFuncionarioProntoIgnoreCaseAndDataProntoAfter(
+                empresaId, "Pronto", nomeU, corteOs);
 
         BigDecimal brutoOs = servicosNovos.stream()
                 .map(os -> BigDecimal.valueOf(os.getValorTotal() != null ? os.getValorTotal() : 0.0))
@@ -93,12 +102,11 @@ public class GanhosController {
         usuarioLogado.setBrutoVendaCalculado(brutoVenda.doubleValue());
         usuarioLogado.setBrutoOsCalculado(brutoOs.doubleValue());
 
-        // 4. MONTAR RESPOSTA COMPATÍVEL COM O MEUPAINEL.JSX
-        Map<String, Object> response = new HashMap<>();
-        response.put("usuario", usuarioLogado); // Envia o objeto com CPF, WhatsApp e Taxas
-        response.put("vendas", vendasNovas);
-        response.put("servicos", servicosNovos);
-        response.put("pagamentos", historico);
+        MeuExtratoResponseDTO response = new MeuExtratoResponseDTO();
+        response.setUsuario(UsuarioMapper.toResponse(usuarioLogado));
+        response.setVendas(vendasNovas.stream().map(VendaExtratoMapper::toExtrato).collect(Collectors.toList()));
+        response.setServicos(servicosNovos.stream().map(OrdemServicoMapper::toResponse).collect(Collectors.toList()));
+        response.setPagamentos(historico.stream().map(PagamentoExtratoMapper::toExtrato).collect(Collectors.toList()));
 
         return ResponseEntity.ok(response);
     }

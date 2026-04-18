@@ -2,6 +2,7 @@ package com.assistencia.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.BatchSize;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
@@ -9,6 +10,7 @@ import lombok.AllArgsConstructor;
 @Table(name = "produto", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"codigo_barras", "empresa_id"})
 })
+@BatchSize(size = 20)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

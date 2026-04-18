@@ -1,21 +1,31 @@
 import axios from 'axios';
 
 const runtimeHost = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
-const defaultBaseURL = `http://${runtimeHost}:4444`;
-const envApi = import.meta.env.VITE_API_URL;
-// "/" ou "" (build) = mesma origem — use com Nginx na porta 80 repassando /api para o backend.
-const baseURLRaw =
-  envApi === '/' || envApi === ''
-    ? ''
-    : envApi != null && envApi !== ''
-      ? envApi
-      : defaultBaseURL;
-const baseURL = baseURLRaw.replace(/\/$/, '');
+const devDefaultBase = `http://${runtimeHost}:8080`;
+/** Origem pública da API em produção (Nginx → 127.0.0.1:8080 na VPS). */
+const PRODUCTION_API_ORIGIN = 'https://api.sharkgestao.com';
+
+const raw = import.meta.env.VITE_API_URL;
+const trimmed = typeof raw === 'string' ? raw.trim() : raw;
+
+function resolveBaseURL() {
+    // Valor explícito (Vercel Dashboard, .env.production, etc.)
+    if (trimmed && trimmed !== '/') {
+        return trimmed.replace(/\/$/, '');
+    }
+    // VITE_API_URL vazio ou "/" — em dev, backend local; em build de produção, nunca use
+    // mesma origem da Vercel (as rotas /api/* não existem lá → 404).
+    if (import.meta.env.PROD) {
+        return PRODUCTION_API_ORIGIN;
+    }
+    return devDefaultBase;
+}
+
+const baseURL = resolveBaseURL();
 
 const api = axios.create({
     baseURL,
     withCredentials: true,
-    // Evita requisições “pendentes” indefinidamente se a API estiver inacessível.
     timeout: 45_000,
 });
 
@@ -50,7 +60,6 @@ api.interceptors.response.use(
             requestUrl.includes('/api/auth/atualizar-senha') ||
             requestUrl.includes('/api/auth/empresas');
 
-        // Login/recuperação exibem erro no próprio formulário.
         if (isAuthFlow) {
             return Promise.reject(error);
         }

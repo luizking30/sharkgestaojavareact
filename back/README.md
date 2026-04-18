@@ -49,7 +49,7 @@ Desenvolvido com **Thymeleaf** e **Bootstrap**, o sistema conta com as seguintes
 1.  Configure o banco de dados no `application.properties`.
 2.  Execute `mvn clean install`.
 3.  Inicie com `mvn spring-boot:run`.
-4.  A API escuta na porta **8080** dentro do container; com o compose, use a porta publicada (ex.: **4444**).
+4.  A API escuta na porta **8080** dentro do container; com o compose, a porta publicada no host é **8080** (`8080:8080`).
 5.  crie seu login.
 6.  Ativação Manual: Como o sistema inicia com usuários bloqueados, acesse seu terminal MySQL ou Workbench e rode:
 UPDATE usuarios SET aprovado = 1, role = 'ROLE_ADMIN' WHERE username = 'NomeDoUsuario';

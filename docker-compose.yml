@@ -1,6 +1,6 @@
 services:
-  # Produção: o Nginx do host serve /var/www/sharkgestao/dist — não subir este serviço no dia a dia.
-  # Opcional: docker compose --profile front-container up -d front
+  # Front na Vercel — não há mais Nginx na VPS servindo dist. Opcional para dev local:
+  # docker compose --profile front-container up -d front
   front:
     profiles:
       - front-container
@@ -24,7 +24,7 @@ services:
       dockerfile: Dockerfile
     container_name: shark-api
     ports:
-      - "4444:8080"
+      - "8080:8080"
     env_file:
       - ./back/.env
     environment:
@@ -34,8 +34,8 @@ services:
       - DB_PASSWORD=123456
       # Rede interna Docker (mesmo valor esperado em back/.env quando a API roda no compose).
       - EVOLUTION_BASE_URL=http://evolution-api:8080
-      # Limita heap JVM em hosts com pouca RAM (ajuste no compose se precisar mais).
-      - "JAVA_OPTS=-Xms128m -Xmx256m"
+      # Heap um pouco maior ajuda o Spring a subir sem travar; limite do container abaixo.
+      - "JAVA_OPTS=-Xms160m -Xmx280m"
     depends_on:
       evolution-api:
         condition: service_started
@@ -45,7 +45,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 300M
+          memory: 400M
 
   shark-db:
     image: mysql:8.0

@@ -1,5 +1,8 @@
 package com.assistencia.controller;
 
+import com.assistencia.dto.ClienteRequestDTO;
+import com.assistencia.dto.ClienteResponseDTO;
+import com.assistencia.dto.mapper.ClienteMapper;
 import com.assistencia.model.Cliente;
 import com.assistencia.model.Usuario;
 import com.assistencia.repository.ClienteRepository;
@@ -16,7 +19,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,9 +34,6 @@ public class ClienteController {
     @Autowired
     private UsuarioRepository usuarioRepo;
 
-    /**
-     * LISTAR CLIENTES DA EMPRESA LOGADA (paginado; filtros opcionais por nome, cpf, whatsapp)
-     */
     @GetMapping
     public ResponseEntity<?> listar(
             @RequestParam(required = false) String nome,
@@ -51,13 +50,10 @@ public class ClienteController {
         String c = (cpf != null && !cpf.isBlank()) ? cpf : null;
         String w = (whatsapp != null && !whatsapp.isBlank()) ? whatsapp : null;
 
-        Page<Cliente> clientesDaEmpresa = repo.findByEmpresaIdFiltrado(empresaId, n, c, w, pageable);
-        return ResponseEntity.ok(clientesDaEmpresa);
+        Page<Cliente> page = repo.findByEmpresaIdFiltrado(empresaId, n, c, w, pageable);
+        return ResponseEntity.ok(page.map(ClienteMapper::toResponse));
     }
 
-    /**
-     * Verifica CPF ou WhatsApp já cadastrados na empresa (exceto o id informado, para edição).
-     */
     @GetMapping("/checar-duplicata")
     public ResponseEntity<Map<String, Boolean>> checarDuplicata(
             @RequestParam(required = false) String cpf,
@@ -84,33 +80,39 @@ public class ClienteController {
         return ResponseEntity.ok(Map.of("duplicado", false));
     }
 
-    /**
-     * SALVAR OU ATUALIZAR CLIENTE
-     */
     @PostMapping("/salvar")
-    public ResponseEntity<?> salvar(@RequestBody Cliente c) { // @RequestBody é essencial para React
+    public ResponseEntity<?> salvar(@RequestBody ClienteRequestDTO req) {
         try {
             Usuario logado = getUsuarioLogado();
             if (logado == null || logado.getEmpresa() == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Sessão expirada ou usuário inválido.");
             }
 
-            // Garante que o cliente salvo pertença à empresa do usuário logado
+            Long pid = ClienteMapper.parseIdOrNull(req.getId());
+            Cliente c;
+            if (pid != null) {
+                c = repo.findById(pid).orElse(null);
+                if (c == null || !c.getEmpresa().getId().equals(logado.getEmpresa().getId())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cliente inválido.");
+                }
+            } else {
+                c = new Cliente();
+            }
+
+            ClienteMapper.applyRequest(req, c);
             c.setEmpresa(logado.getEmpresa());
 
-            // Validação de CPF Duplicado na mesma empresa
             Optional<Cliente> clienteExistente = repo.findByCpfAndEmpresaId(c.getCpf(), logado.getEmpresa().getId());
 
             if (clienteExistente.isPresent()) {
                 Cliente existente = clienteExistente.get();
-                // Se for novo cadastro (id null) ou edição de outro ID
                 if (c.getId() == null || !existente.getId().equals(c.getId())) {
                     return ResponseEntity.badRequest().body("Já existe um cliente com este CPF nesta unidade.");
                 }
             }
 
             Cliente salvo = repo.save(c);
-            return ResponseEntity.ok(salvo);
+            return ResponseEntity.ok(ClienteMapper.toResponse(salvo));
 
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             return ResponseEntity.badRequest().body("Erro de integridade: Verifique se os dados já existem.");
@@ -120,11 +122,8 @@ public class ClienteController {
         }
     }
 
-    /**
-     * DELETAR CLIENTE (APENAS ADMIN)
-     */
     @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")
-    @DeleteMapping("/deletar/{id}") // Mudado para DeleteMapping para ser semântico
+    @DeleteMapping("/deletar/{id}")
     public ResponseEntity<?> deletar(@PathVariable Long id) {
         try {
             Usuario logado = getUsuarioLogado();
@@ -141,26 +140,16 @@ public class ClienteController {
         }
     }
 
-    /**
-     * ENDPOINT PARA AUTOCOMPLETE
-     */
     @GetMapping("/sugestoes")
-    public ResponseEntity<List<Map<String, Object>>> buscarSugestoes(@RequestParam String termo) {
+    public ResponseEntity<List<ClienteResponseDTO>> buscarSugestoes(@RequestParam String termo) {
         Usuario logado = getUsuarioLogado();
-        if (logado == null) return ResponseEntity.ok(new java.util.ArrayList<>());
+        if (logado == null) return ResponseEntity.ok(List.of());
 
         List<Cliente> clientes = repo.findByNomeContainingIgnoreCaseAndEmpresaId(termo, logado.getEmpresa().getId());
 
-        List<Map<String, Object>> sugestoes = clientes.stream()
+        List<ClienteResponseDTO> sugestoes = clientes.stream()
                 .limit(8)
-                .map(c -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("id", c.getId());
-                    map.put("nome", c.getNome());
-                    map.put("whatsapp", c.getWhatsapp());
-                    map.put("cpf", c.getCpf());
-                    return map;
-                })
+                .map(ClienteMapper::toResponse)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(sugestoes);

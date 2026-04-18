@@ -1,7 +1,5 @@
 package com.assistencia.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,7 +10,6 @@ import lombok.EqualsAndHashCode;
 @Table(name = "item_venda")
 @Data
 @NoArgsConstructor
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"}) // 👈 Evita erro com FetchType.LAZY
 public class ItemVenda {
 
     @Id
@@ -23,7 +20,6 @@ public class ItemVenda {
     @JoinColumn(name = "venda_id")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    @JsonBackReference // 👈 ESSENCIAL: Impede que o JSON entre em loop infinito
     private Venda venda;
 
     @ManyToOne(fetch = FetchType.EAGER) // 👈 DICA: Mude para EAGER para o React receber os dados do produto (nome, etc)
@@ -38,7 +34,6 @@ public class ItemVenda {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)
-    @JsonIgnoreProperties("usuario") // Evita carregar dados desnecessários da empresa no item
     private Empresa empresa;
 
     @Column(name = "custo_unitario")

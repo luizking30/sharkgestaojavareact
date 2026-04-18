@@ -1,11 +1,10 @@
 package com.assistencia.model;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.ToString;
 import lombok.EqualsAndHashCode;
+import org.hibernate.annotations.BatchSize;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +12,6 @@ import java.util.List;
 @Entity
 @Table(name = "venda") // 🎯 Fixado no singular conforme seu banco
 @Data
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Venda {
 
     @Id
@@ -37,14 +35,12 @@ public class Venda {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)
-    @JsonIgnoreProperties({"usuarios", "configuracoes", "clientes"})
     private Empresa empresa;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "vendedor_id", nullable = true)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    @JsonIgnoreProperties({"password", "permissoes", "empresa"}) // 🔐 Segurança extra
     private Usuario vendedor;
 
     @Column(name = "nome_vendedor_no_ato")
@@ -53,7 +49,7 @@ public class Venda {
     private boolean pago = false;
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @JsonManagedReference
+    @BatchSize(size = 20)
     private List<ItemVenda> itens = new ArrayList<>();
 
     public Venda() {

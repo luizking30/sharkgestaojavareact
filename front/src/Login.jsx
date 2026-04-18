@@ -33,6 +33,17 @@ function Login() {
     }
   }, [successMsg]);
 
+  const extrairMensagemBackend = (data) => {
+    if (data == null) return '';
+    if (typeof data === 'string') return data.trim();
+    if (typeof data === 'object') {
+      return String(
+        data.message || data.error || data.title || data.detail || ''
+      ).trim();
+    }
+    return '';
+  };
+
   // --- LÓGICA DE LOGIN ---
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -52,36 +63,52 @@ function Login() {
       navigate('/dashboard', { replace: true });
 
     } catch (error) {
-      if (error.response && error.response.data) {
-        const data = error.response.data;
-        if (error.response.status === 401 || error.response.status === 403) {
-          const backendMsg =
-              typeof data === 'string'
-                  ? data.trim()
-                  : data?.message || data?.error || '';
+      const status = error.response?.status;
+      const data = error.response?.data;
 
-          const norm = backendMsg.toLowerCase();
-          const isGeneric =
-              !backendMsg ||
-              norm === 'forbidden' ||
-              norm === 'unauthorized';
-
-          let msg = backendMsg;
-          if (isGeneric) {
-            msg =
-                error.response.status === 403
-                    ? 'Acesso negado.'
-                    : 'Não foi possível validar o login. Tente novamente.';
-          }
-
-          setErrorMsg(msg);
-        } else {
-          setErrorMsg('Não foi possível validar o login. Tente novamente.');
-        }
-      } else {
+      if (!error.response) {
         const isTimeout = error?.code === 'ECONNABORTED' || String(error?.message || '').includes('timeout');
-        setErrorMsg(isTimeout ? 'Tempo esgotado: verifique se a API está no ar e o domínio está correto.' : 'ERRO DE CONEXÃO COM O SERVIDOR');
+        setErrorMsg(
+          isTimeout
+            ? 'Tempo esgotado: a API pode estar lenta ou iniciando. Aguarde e tente de novo.'
+            : 'Sem conexão com o servidor. Verifique se a API está no ar (ou aguarde a reinicialização).'
+        );
+        return;
       }
+
+      if (status >= 502 && status <= 504) {
+        setErrorMsg(
+          'Serviço temporariamente indisponível (gateway). A API pode estar iniciando — aguarde 2–5 minutos e tente novamente.'
+        );
+        return;
+      }
+
+      if (status === 500 || status === 501) {
+        setErrorMsg(extrairMensagemBackend(data) || 'Erro interno no servidor. Tente novamente em instantes.');
+        return;
+      }
+
+      if (status === 401 || status === 403) {
+        const backendMsg = extrairMensagemBackend(data);
+        const norm = backendMsg.toLowerCase();
+        const isGeneric =
+            !backendMsg ||
+            norm === 'forbidden' ||
+            norm === 'unauthorized' ||
+            norm === 'bad credentials';
+
+        let msg = backendMsg;
+        if (isGeneric) {
+          msg = status === 403 ? 'Acesso negado.' : 'Credenciais inválidas ou usuário não encontrado.';
+        }
+        setErrorMsg(msg);
+        return;
+      }
+
+      setErrorMsg(
+        extrairMensagemBackend(data) ||
+          'Não foi possível concluir o login. Tente novamente ou confira se a API está respondendo.'
+      );
     } finally {
       setLoginSubmitting(false);
     }
@@ -174,7 +201,7 @@ function Login() {
                         required
                         onChange={(e) => setUsername(e.target.value)}
                     />
-                    <label htmlFor="userInput"><i className="bi bi-person me-2"></i>Login</label>
+                    <label htmlFor="userInput"><i className="bi bi-person me-2"></i>Login, e-mail ou CPF</label>
                   </div>
 
                   <div className="form-floating mb-4">

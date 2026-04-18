@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Modifying;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,11 +18,11 @@ import org.springframework.data.domain.Pageable;
 public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long> {
 
     // 🔥 RESOLVE O ERRO: Adicionado IgnoreCase para bater com a chamada do GanhosController
-    List<OrdemServico> findByEmpresaIdAndStatusAndFuncionarioAndamentoIgnoreCaseAndDataEntregaAfter(
+    List<OrdemServico> findByEmpresaIdAndStatusAndFuncionarioProntoIgnoreCaseAndDataProntoAfter(
             Long empresaId,
             String status,
-            String funcionarioAndamento,
-            LocalDateTime dataEntrega
+            String funcionarioPronto,
+            LocalDateTime dataPronto
     );
 
     // --- 🔐 SEGURANÇA SAAS: LISTAGEM POR LOJA ---
@@ -91,4 +92,8 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
     List<OrdemServico> findByEmpresaIdAndStatusOrderByIdDesc(Long empresaId, String status);
 
     List<OrdemServico> findByEmpresaIdAndClienteNomeContainingIgnoreCaseOrderByIdDesc(Long empresaId, String nome);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE OrdemServico os SET os.tecnico = null WHERE os.tecnico.id = :uid")
+    void clearTecnicoByUsuarioId(@Param("uid") Long uid);
 }

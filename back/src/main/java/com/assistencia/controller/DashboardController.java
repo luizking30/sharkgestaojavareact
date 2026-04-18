@@ -1,5 +1,6 @@
 package com.assistencia.controller;
 
+import com.assistencia.dto.DashboardResponseDTO;
 import com.assistencia.model.Usuario;
 import com.assistencia.repository.ClienteRepository;
 import com.assistencia.repository.OrdemServicoRepository;
@@ -11,8 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -34,7 +33,7 @@ public class DashboardController {
     }
 
     @GetMapping
-    public ResponseEntity<?> carregarDashboard() {
+    public ResponseEntity<DashboardResponseDTO> carregarDashboard() {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
         Long empresaId = logado.getEmpresa().getId();
@@ -43,35 +42,31 @@ public class DashboardController {
         LocalDateTime inicioHoje = hoje.atStartOfDay();
         LocalDateTime fimHoje = hoje.atTime(LocalTime.MAX);
 
-        // 1. Cálculos de Contagem
         long clientesHoje = clienteRepository.countByEmpresaIdAndDataCadastroBetween(empresaId, inicioHoje, fimHoje);
         long osCriadasHoje = ordemServicoRepository.countByEmpresaIdAndDataBetween(empresaId, inicioHoje, fimHoje);
         long vendasHoje = vendaRepository.countByEmpresaIdAndDataHoraBetween(empresaId, inicioHoje, fimHoje);
         long osEntreguesHoje = ordemServicoRepository.countByEmpresaIdAndStatusAndDataEntregaBetween(empresaId, "Entregue", inicioHoje, fimHoje);
 
-        // 2. Financeiro: Vendas (Produtos)
         Double totalVendasBruto = coalesce(vendaRepository.somarVendasDoDia(empresaId, inicioHoje, fimHoje));
         Double custoEstoque = coalesce(vendaRepository.somarCustoEstoqueDasVendasDoDia(empresaId, inicioHoje, fimHoje));
-        Double vendaLiquida = totalVendasBruto - custoEstoque;
+        double vendaLiquida = totalVendasBruto - custoEstoque;
 
-        // 3. Financeiro: Serviços (Ordens de Serviço)
         Double totalOsBruto = coalesce(ordemServicoRepository.somarValorBrutoOsEntregues(empresaId, "Entregue", inicioHoje, fimHoje));
         Double totalGastoPecas = coalesce(ordemServicoRepository.somarCustoPecasOsEntregues(empresaId, "Entregue", inicioHoje, fimHoje));
-        Double servicoLiquido = totalOsBruto - totalGastoPecas;
+        double servicoLiquido = totalOsBruto - totalGastoPecas;
 
-        // 4. Montagem da Resposta Plana para o React
-        Map<String, Object> data = new HashMap<>();
-        data.put("clientesHoje", clientesHoje);
-        data.put("osCriadasHoje", osCriadasHoje);
-        data.put("vendasHoje", vendasHoje);
-        data.put("osEntreguesHoje", osEntreguesHoje);
-        data.put("totalVendasValorHoje", totalVendasBruto);
-        data.put("custoEstoqueHoje", custoEstoque);
-        data.put("vendaLiquidaHoje", vendaLiquida);
-        data.put("totalServicosHoje", totalOsBruto);
-        data.put("totalGastoPecasHoje", totalGastoPecas);
-        data.put("servicoLiquidoHoje", servicoLiquido);
-        data.put("lucroTotalHoje", vendaLiquida + servicoLiquido);
+        DashboardResponseDTO data = new DashboardResponseDTO();
+        data.setClientesHoje(clientesHoje);
+        data.setOsCriadasHoje(osCriadasHoje);
+        data.setVendasHoje(vendasHoje);
+        data.setOsEntreguesHoje(osEntreguesHoje);
+        data.setTotalVendasValorHoje(totalVendasBruto);
+        data.setCustoEstoqueHoje(custoEstoque);
+        data.setVendaLiquidaHoje(vendaLiquida);
+        data.setTotalServicosHoje(totalOsBruto);
+        data.setTotalGastoPecasHoje(totalGastoPecas);
+        data.setServicoLiquidoHoje(servicoLiquido);
+        data.setLucroTotalHoje(vendaLiquida + servicoLiquido);
 
         return ResponseEntity.ok(data);
     }

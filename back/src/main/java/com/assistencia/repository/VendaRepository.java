@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Modifying;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,10 +18,12 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
 
     List<Venda> findByEmpresaIdOrderByDataHoraDesc(Long empresaId);
 
-    @EntityGraph(attributePaths = {"vendedor", "itens", "itens.produto"})
+    /**
+     * Sem EntityGraph em {@code itens}: paginação com LIMIT/OFFSET no SQL (evita HHH90003004).
+     * Itens carregam sob demanda com batch ({@code @BatchSize} + default_batch_fetch_size).
+     */
     Page<Venda> findByEmpresaIdOrderByDataHoraDesc(Long empresaId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"vendedor", "itens", "itens.produto"})
     @Query(value = "SELECT DISTINCT v FROM Venda v WHERE v.empresa.id = :empresaId "
             + "AND (:id IS NULL OR v.id = :id) "
             + "AND (:vend IS NULL OR :vend = '' OR LOWER(COALESCE(v.nomeVendedorNoAto, '')) LIKE LOWER(CONCAT('%', :vend, '%'))) "
@@ -75,4 +77,8 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
 
     @Query("SELECT COALESCE(SUM(v.valorTotal), 0.0) FROM Venda v WHERE v.empresa.id = :empresaId AND v.vendedor.id = :vendedorId AND v.pago = false")
     Double somarTotalVendasPendentesPorVendedor(@Param("empresaId") Long empresaId, @Param("vendedorId") Long vendedorId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Venda v SET v.vendedor = null WHERE v.vendedor.id = :uid")
+    void clearVendedorByUsuarioId(@Param("uid") Long uid);
 }

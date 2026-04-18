@@ -1,6 +1,12 @@
 package com.assistencia.controller;
 
 import com.assistencia.model.*;
+import com.assistencia.dto.EmpresaResponseDTO;
+import com.assistencia.dto.PagamentoExtratoDTO;
+import com.assistencia.dto.UsuarioResponseDTO;
+import com.assistencia.dto.mapper.EmpresaMapper;
+import com.assistencia.dto.mapper.PagamentoExtratoMapper;
+import com.assistencia.dto.mapper.UsuarioMapper;
 import com.assistencia.repository.*;
 import com.assistencia.util.SecurityUtils;
 import com.assistencia.service.EmailService;
@@ -104,10 +110,18 @@ public class AdminController {
             calcularComissoes(u, ordensDoTecnico, vendasDoUsuario, pagamentosDoUsuario);
         }
 
+        List<UsuarioResponseDTO> usuariosDto = usuarios.stream()
+                .map(UsuarioMapper::toResponse)
+                .toList();
+        List<PagamentoExtratoDTO> pagamentosDto = todosPagamentos.stream()
+                .map(PagamentoExtratoMapper::toExtrato)
+                .toList();
+        EmpresaResponseDTO empresaDto = EmpresaMapper.toResponse(adminLogado.getEmpresa());
+
         Map<String, Object> response = new HashMap<>();
-        response.put("usuarios", usuarios);
-        response.put("pagamentos", todosPagamentos);
-        response.put("empresa", adminLogado.getEmpresa());
+        response.put("usuarios", usuariosDto);
+        response.put("pagamentos", pagamentosDto);
+        response.put("empresa", empresaDto);
 
         return ResponseEntity.ok(response);
     }

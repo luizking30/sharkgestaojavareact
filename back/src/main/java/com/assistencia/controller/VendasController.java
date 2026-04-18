@@ -1,5 +1,8 @@
 package com.assistencia.controller;
 
+import com.assistencia.dto.VendaResponseDTO;
+import com.assistencia.dto.VendaSalvarRequestDTO;
+import com.assistencia.dto.mapper.VendaMapper;
 import com.assistencia.model.*;
 import com.assistencia.repository.ProdutoRepository;
 import com.assistencia.repository.VendaRepository;
@@ -42,9 +45,8 @@ public class VendasController {
         this.produtoRepo = produtoRepo;
     }
 
-    // 1. Listar Vendas da Empresa (paginado; filtros opcionais: id, vendedor = trecho do nome, data = yyyy-MM-dd)
     @GetMapping
-    public ResponseEntity<Page<Venda>> listarVendas(
+    public ResponseEntity<Page<VendaResponseDTO>> listarVendas(
             @RequestParam(required = false) Long id,
             @RequestParam(required = false) String vendedor,
             @RequestParam(required = false) String data,
@@ -66,16 +68,15 @@ public class VendasController {
         String vendF = (vendedor != null && !vendedor.isBlank()) ? vendedor : null;
 
         boolean temFiltro = idFiltro != null || vendF != null || d0 != null;
-        if (!temFiltro) {
-            return ResponseEntity.ok(vendaRepo.findByEmpresaIdOrderByDataHoraDesc(empresaId, pageable));
-        }
+        Page<Venda> page = !temFiltro
+                ? vendaRepo.findByEmpresaIdOrderByDataHoraDesc(empresaId, pageable)
+                : vendaRepo.findByEmpresaFiltrado(empresaId, idFiltro, vendF, d0, d1, pageable);
 
-        return ResponseEntity.ok(vendaRepo.findByEmpresaFiltrado(empresaId, idFiltro, vendF, d0, d1, pageable));
+        return ResponseEntity.ok(VendaMapper.toResponsePage(page));
     }
 
-    // 2. Filtro dinâmico (Ajustado para o novo método do Repository)
     @GetMapping("/filtrar")
-    public ResponseEntity<List<Venda>> filtrarVendas(
+    public ResponseEntity<List<VendaResponseDTO>> filtrarVendas(
             @RequestParam(required = false) String vendedor,
             @RequestParam(required = false) String data,
             @RequestParam(required = false) Long id) {
@@ -85,9 +86,11 @@ public class VendasController {
         Long empresaId = logado.getEmpresa().getId();
 
         if (id != null) {
-            return ResponseEntity.ok(vendaRepo.findById(id)
-                    .filter(v -> v.getEmpresa().getId().equals(empresaId))
-                    .map(List::of).orElse(new ArrayList<>()));
+            return ResponseEntity.ok(
+                    vendaRepo.findById(id)
+                            .filter(v -> v.getEmpresa().getId().equals(empresaId))
+                            .map(v -> VendaMapper.toResponseList(List.of(v)))
+                            .orElse(new ArrayList<>()));
         }
 
         LocalDateTime dataInicio = (data != null && !data.isEmpty())
@@ -100,58 +103,62 @@ public class VendasController {
 
         List<Venda> resultados;
         if (vendedor != null && !vendedor.isEmpty()) {
-            // 🎯 CHAMADA CORRIGIDA: Agora batendo com o nome definido no VendaRepository
             resultados = vendaRepo.filtrarVendasPorVendedor(empresaId, vendedor, dataInicio, dataFim);
         } else {
             resultados = vendaRepo.findByEmpresaIdAndDataHoraBetween(empresaId, dataInicio, dataFim);
         }
 
-        return ResponseEntity.ok(resultados);
+        return ResponseEntity.ok(VendaMapper.toResponseList(resultados));
     }
 
-    // 3. Salvar Venda (Com baixa no estoque e cálculo automático via PrePersist na Model)
     @Transactional
     @PostMapping("/salvar")
-    public ResponseEntity<?> salvar(@RequestBody Venda venda) {
+    public ResponseEntity<?> salvar(@RequestBody VendaSalvarRequestDTO dto) {
         try {
             Usuario vendedorObj = securityUtils.getUsuarioLogado();
             if (vendedorObj == null) return ResponseEntity.status(401).body("Sessão inválida!");
 
-            if (venda.getItens() == null || venda.getItens().isEmpty()) {
+            if (dto.getItens() == null || dto.getItens().isEmpty()) {
                 return ResponseEntity.badRequest().body("Carrinho vazio!");
             }
 
+            Venda venda = new Venda();
             venda.setEmpresa(vendedorObj.getEmpresa());
             venda.setVendedor(vendedorObj);
             venda.setDataHora(LocalDateTime.now());
             venda.setPago(true);
 
-            for (ItemVenda item : venda.getItens()) {
-                Produto prod = produtoRepo.findById(item.getProduto().getId())
+            for (VendaSalvarRequestDTO.ItemSalvarDTO row : dto.getItens()) {
+                if (row.getProduto() == null || row.getProduto().getId() == null) {
+                    return ResponseEntity.badRequest().body("Item sem produto.");
+                }
+                Produto prod = produtoRepo.findById(row.getProduto().getId())
                         .orElseThrow(() -> new RuntimeException("Produto não encontrado!"));
 
-                if (prod.getQuantidade() < item.getQuantidade()) {
+                if (prod.getQuantidade() < row.getQuantidade()) {
                     return ResponseEntity.badRequest().body("Estoque insuficiente: " + prod.getNome());
                 }
 
+                ItemVenda item = new ItemVenda();
                 item.setProduto(prod);
+                item.setQuantidade(row.getQuantidade());
+                item.setPrecoUnitario(row.getPrecoUnitario());
+                item.setDesconto(row.getDesconto() != null ? row.getDesconto() : 0.0);
                 item.setCustoUnitario(prod.getPrecoCusto() != null ? prod.getPrecoCusto() : 0.0);
-                item.setVenda(venda);
                 item.setEmpresa(vendedorObj.getEmpresa());
+                venda.adicionarItem(item);
 
-                // Atualiza estoque
-                prod.setQuantidade(prod.getQuantidade() - item.getQuantidade());
+                prod.setQuantidade(prod.getQuantidade() - row.getQuantidade());
                 produtoRepo.save(prod);
             }
 
-            // O lucro e comissões são calculados automaticamente pela Model Venda antes do save
-            return ResponseEntity.ok(vendaRepo.save(venda));
+            Venda salva = vendaRepo.save(venda);
+            return ResponseEntity.ok(VendaMapper.toResponse(salva));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Erro: " + e.getMessage());
         }
     }
 
-    // 4. PDF do Cupom (Tamanho para impressora térmica)
     @GetMapping("/pdf/{id}")
     public ResponseEntity<byte[]> gerarPdfVenda(@PathVariable Long id) {
         try {
@@ -192,7 +199,6 @@ public class VendasController {
         }
     }
 
-    // 5. Deletar (Estorno de Estoque)
     @Transactional
     @PreAuthorize("hasAnyRole('ADMIN','OWNER')")
     @DeleteMapping("/deletar/{id}")

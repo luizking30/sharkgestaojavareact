@@ -31,6 +31,21 @@ const MeuPainel = ({ usuarioLogado }) => {
 
     const totalGeral = (user?.saldoVendaCalculado || 0) + (user?.totalComissaoOsAcumulada || 0);
 
+    const imprimirOS = async (id) => {
+        try {
+            const response = await api.get(`/api/ordens/pdf/${id}`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `OS_${id}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error('Erro ao gerar PDF da OS', e);
+        }
+    };
+
     return (
         <div className="mt-2 text-white">
             <div className="row mb-4">
@@ -170,18 +185,23 @@ const MeuPainel = ({ usuarioLogado }) => {
                                 <th>O.S.</th>
                                 <th>PRODUTO/SERVIÇO</th>
                                 <th className="pe-4 text-end">SUA COMISSÃO</th>
+                                <th className="pe-4 text-end">AÇÕES</th>
                             </tr>
                             </thead>
                             <tbody>
                             {listaServicos.map(os => {
-                                const liq = (os.valorTotal || 0) - (os.custoPeca || 0);
-                                const comissao = liq * ((user?.comissaoOs || 0) / 100);
+                                const comissao = os.comissaoTecnicoValor ?? 0;
                                 return (
                                     <tr key={os.id}>
-                                        <td className="ps-4 text-white-50 val-mono">{formatarData(os.data)}</td>
+                                        <td className="ps-4 text-white-50 val-mono">{formatarData(os.dataPronto || os.data)}</td>
                                         <td className="text-success fw-bold">#{os.id}</td>
                                         <td>{os.produto}</td>
                                         <td className="pe-4 text-end fw-bold text-success val-mono">{formatarMoeda(comissao)}</td>
+                                        <td className="pe-4 text-end">
+                                            <button className="btn btn-sm btn-outline-info" onClick={() => imprimirOS(os.id)}>
+                                                PDF
+                                            </button>
+                                        </td>
                                     </tr>
                                 );
                             })}

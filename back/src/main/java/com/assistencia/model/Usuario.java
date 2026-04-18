@@ -53,7 +53,10 @@ public class Usuario {
     @Column(nullable = false)
     private Double comissaoVenda = 0.0;
 
-    @JsonIgnore
+    /** Data de cadastro do usuário (para “dias na plataforma” no painel OWNER). */
+    @Column(name = "data_cadastro")
+    private LocalDateTime dataCadastro = LocalDateTime.now();
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;
@@ -101,6 +104,13 @@ public class Usuario {
 
     public Usuario() {}
 
+    @PrePersist
+    public void prePersistDataCadastro() {
+        if (dataCadastro == null) {
+            dataCadastro = LocalDateTime.now();
+        }
+    }
+
     public Usuario(String nome, String username, String email, String whatsapp, String cpf, String password, String role, boolean aprovado, Empresa empresa) {
         this.nome = nome;
         this.username = username;
@@ -133,6 +143,7 @@ public class Usuario {
     public String getCpf() { return cpf; }
     public void setCpf(String cpf) { this.cpf = cpf; }
 
+    @JsonIgnore
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
@@ -161,6 +172,9 @@ public class Usuario {
 
     public Empresa getEmpresa() { return empresa; }
     public void setEmpresa(Empresa empresa) { this.empresa = empresa; }
+
+    public LocalDateTime getDataCadastro() { return dataCadastro; }
+    public void setDataCadastro(LocalDateTime dataCadastro) { this.dataCadastro = dataCadastro; }
 
     public String getResetPasswordToken() { return resetPasswordToken; }
     public void setResetPasswordToken(String resetPasswordToken) { this.resetPasswordToken = resetPasswordToken; }

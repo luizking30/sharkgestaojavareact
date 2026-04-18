@@ -1,5 +1,8 @@
 package com.assistencia.controller;
 
+import com.assistencia.dto.ProdutoRequestDTO;
+import com.assistencia.dto.ProdutoResponseDTO;
+import com.assistencia.dto.mapper.ProdutoMapper;
 import com.assistencia.model.Produto;
 import com.assistencia.model.Usuario;
 import com.assistencia.repository.ProdutoRepository;
@@ -15,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/estoque")
@@ -29,16 +33,15 @@ public class EstoqueController {
         this.securityUtils = securityUtils;
     }
 
-    // 1. Listar (Retorna JSON filtrado por Empresa)
     @GetMapping
-    public ResponseEntity<Page<Produto>> listar(@PageableDefault(size = 20, sort = "nome") Pageable pageable) {
+    public ResponseEntity<Page<ProdutoResponseDTO>> listar(@PageableDefault(size = 20, sort = "nome") Pageable pageable) {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
-        return ResponseEntity.ok(repo.findByEmpresaId(logado.getEmpresa().getId(), pageable));
+        Page<Produto> page = repo.findByEmpresaId(logado.getEmpresa().getId(), pageable);
+        return ResponseEntity.ok(page.map(ProdutoMapper::toResponse));
     }
 
-    /** Totais de investimento / faturamento previsto (toda a empresa, independente da página da listagem). */
     @GetMapping("/resumo-financeiro")
     public ResponseEntity<Map<String, Double>> resumoFinanceiro() {
         Usuario logado = securityUtils.getUsuarioLogado();
@@ -55,50 +58,58 @@ public class EstoqueController {
         return ResponseEntity.ok(m);
     }
 
-    // 2. Buscar por ID
     @GetMapping("/buscar/{id}")
-    public ResponseEntity<Produto> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<ProdutoResponseDTO> buscarPorId(@PathVariable Long id) {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
         return repo.findById(id)
                 .filter(p -> p.getEmpresa().getId().equals(logado.getEmpresa().getId()))
+                .map(ProdutoMapper::toResponse)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 3. Buscar por Código de Barras (Usado no PDV e Estoque)
     @GetMapping("/buscar-por-codigo")
-    public ResponseEntity<Produto> buscarPorCodigo(@RequestParam String codigo) {
+    public ResponseEntity<ProdutoResponseDTO> buscarPorCodigo(@RequestParam String codigo) {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
         return repo.findByCodigoBarrasAndEmpresaId(codigo, logado.getEmpresa().getId())
+                .map(ProdutoMapper::toResponse)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 4. Sugestões para Autocomplete (Resolve o erro 404 nas Vendas)
     @GetMapping("/sugestoes")
-    public ResponseEntity<List<Produto>> buscarSugestoes(@RequestParam String termo) {
+    public ResponseEntity<List<ProdutoResponseDTO>> buscarSugestoes(@RequestParam String termo) {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
         List<Produto> sugestoes = repo.findByNomeContainingIgnoreCaseAndEmpresaId(termo, logado.getEmpresa().getId());
-        return ResponseEntity.ok(sugestoes);
+        return ResponseEntity.ok(sugestoes.stream().map(ProdutoMapper::toResponse).collect(Collectors.toList()));
     }
 
-    // 5. Salvar ou Atualizar
     @PostMapping("/salvar")
-    public ResponseEntity<?> salvar(@RequestBody Produto produto) {
+    public ResponseEntity<?> salvar(@RequestBody ProdutoRequestDTO dto) {
         try {
             Usuario logado = securityUtils.getUsuarioLogado();
             if (logado == null) return ResponseEntity.status(401).body("Sessão expirada");
 
-            // 🔐 ISOLAMENTO SAAS: Garante o vínculo com a empresa correta
+            Long pid = ProdutoMapper.parseIdOrNull(dto.getId());
+            Produto produto;
+            if (pid != null) {
+                produto = repo.findById(pid).orElse(null);
+                if (produto == null || !produto.getEmpresa().getId().equals(logado.getEmpresa().getId())) {
+                    return ResponseEntity.status(403).body("Produto inválido.");
+                }
+            } else {
+                produto = new Produto();
+            }
+
+            ProdutoMapper.applyRequest(dto, produto);
             produto.setEmpresa(logado.getEmpresa());
 
-            // Validação de duplicidade no código de barras dentro da mesma empresa
             if (produto.getCodigoBarras() != null && !produto.getCodigoBarras().isEmpty()) {
                 Optional<Produto> existenteCod = repo.findByCodigoBarrasAndEmpresaId(produto.getCodigoBarras(), logado.getEmpresa().getId());
                 if (existenteCod.isPresent()) {
@@ -109,14 +120,13 @@ public class EstoqueController {
             }
 
             Produto salvo = repo.save(produto);
-            return ResponseEntity.ok(salvo);
+            return ResponseEntity.ok(ProdutoMapper.toResponse(salvo));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Erro: " + e.getMessage());
         }
     }
 
-    // 6. Deletar (Padrão Rest)
     @DeleteMapping("/deletar/{id}")
     public ResponseEntity<?> deletar(@PathVariable Long id) {
         Usuario logado = securityUtils.getUsuarioLogado();

@@ -6,7 +6,7 @@ RUN npm install
 
 COPY . .
 
-# Produção atrás do Nginx (porta 80): mesma origem. Dev local: omita ou use http://host:4444.
+# Produção atrás do Nginx (porta 80): mesma origem. Dev local: omita ou use http://host:8080.
 ARG VITE_API_URL=/
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build

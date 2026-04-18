@@ -11,6 +11,8 @@ import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -170,6 +172,26 @@ public class WhatsappService {
         String msg = "Recuperacao de senha Shark Gestao.%n" +
                 "Use este link (valido por 1 hora):%n" + link;
         enviarMensagem(whatsapp, msg, false);
+    }
+
+    public void enviarAtualizacaoOrdemServicoCliente(
+            String whatsappCliente,
+            Long ordemId,
+            String status,
+            LocalDateTime dataHoraStatus,
+            String funcionarioNome
+    ) {
+        String funcionario = (funcionarioNome == null || funcionarioNome.isBlank()) ? "Nao informado" : funcionarioNome;
+        String dataHora = (dataHoraStatus == null)
+                ? "Nao informado"
+                : dataHoraStatus.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+        String msg = "Atualizacao da sua Ordem de Servico Shark Gestao.%n%n" +
+                "OS: *#" + ordemId + "*%n" +
+                "Status atual: *" + status + "*%n" +
+                "Data/Hora: *" + dataHora + "*%n" +
+                "Atualizado por: *" + funcionario + "*%n%n" +
+                "Qualquer duvida, responda neste numero.";
+        enviarMensagem(whatsappCliente, msg, false);
     }
 
     /** Envia texto com {@code linkPreview: false} (mais estável para o destinatário ver o conteúdo). */
