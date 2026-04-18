@@ -2,20 +2,33 @@ import axios from 'axios';
 
 const runtimeHost = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1';
 const devDefaultBase = `http://${runtimeHost}:8080`;
-/** Origem pública da API em produção (Nginx → 127.0.0.1:8080 na VPS). */
+/**
+ * Só o host da API (sem /api). Os paths do Axios já começam com /api/...
+ * Se colocar /api aqui, vira /api/api/... e o Spring responde 404.
+ */
 const PRODUCTION_API_ORIGIN = 'https://api.sharkgestao.com';
 
 const raw = import.meta.env.VITE_API_URL;
 const trimmed = typeof raw === 'string' ? raw.trim() : raw;
 
-function resolveBaseURL() {
-    // Valor explícito (Vercel Dashboard, .env.production, etc.)
-    if (trimmed && trimmed !== '/') {
-        return trimmed.replace(/\/$/, '');
+function normalizeApiOrigin(url) {
+    let u = url.replace(/\/$/, '');
+    if (u.endsWith('/api')) {
+        u = u.slice(0, -4);
     }
-    // VITE_API_URL vazio ou "/" — em dev, backend local; em build de produção, nunca use
-    // mesma origem da Vercel (as rotas /api/* não existem lá → 404).
-    if (import.meta.env.PROD) {
+    return u;
+}
+
+function resolveBaseURL() {
+    if (trimmed && trimmed !== '/') {
+        return normalizeApiOrigin(trimmed);
+    }
+    const onVercelOrProdSite =
+        typeof window !== 'undefined' &&
+        (window.location.hostname.endsWith('.vercel.app') ||
+            window.location.hostname === 'sharkgestao.com' ||
+            window.location.hostname === 'www.sharkgestao.com');
+    if (import.meta.env.PROD || onVercelOrProdSite) {
         return PRODUCTION_API_ORIGIN;
     }
     return devDefaultBase;
