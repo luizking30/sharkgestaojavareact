@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,8 +27,10 @@ public interface OrdemServicoRepository extends JpaRepository<OrdemServico, Long
     // --- 🔐 SEGURANÇA SAAS: LISTAGEM POR LOJA ---
     List<OrdemServico> findByEmpresaIdOrderByIdDesc(Long empresaId);
 
+    @EntityGraph(attributePaths = {"tecnico"})
     Page<OrdemServico> findByEmpresaIdOrderByIdDesc(Long empresaId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"tecnico"})
     @Query("SELECT os FROM OrdemServico os WHERE os.empresa.id = :eid "
             + "AND (:id IS NULL OR os.id = :id) "
             + "AND (:nome IS NULL OR :nome = '' OR LOWER(os.clienteNome) LIKE LOWER(CONCAT('%', :nome, '%'))) "

@@ -10,11 +10,21 @@ function Login() {
   const [identificador, setIdentificador] = useState(''); // 🦈 Estado para busca multi-identificador
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
 
   const [successMsg, setSuccessMsg] = useState(location.state?.successMsg || '');
+
+  useEffect(() => {
+    const next = location.state?.successMsg;
+    if (next) {
+      setSuccessMsg(next);
+      // Evita reapresentar a mesma mensagem ao atualizar a página (F5).
+      navigate('.', { replace: true, state: {} });
+    }
+  }, [location.state?.successMsg, navigate]);
 
   useEffect(() => {
     if (successMsg) {
@@ -26,8 +36,10 @@ function Login() {
   // --- LÓGICA DE LOGIN ---
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (loginSubmitting) return;
     setErrorMsg('');
     setSuccessMsg('');
+    setLoginSubmitting(true);
 
     try {
       const response = await api.post('/api/auth/login', {
@@ -36,19 +48,42 @@ function Login() {
       });
 
       localStorage.setItem('usuarioShark', JSON.stringify(response.data));
-      window.location.href = '/dashboard';
+      window.dispatchEvent(new CustomEvent('auth:login', { detail: response.data }));
+      navigate('/dashboard', { replace: true });
 
     } catch (error) {
       if (error.response && error.response.data) {
         const data = error.response.data;
         if (error.response.status === 401 || error.response.status === 403) {
-          setErrorMsg(typeof data === 'object' ? data.message : data);
+          const backendMsg =
+              typeof data === 'string'
+                  ? data.trim()
+                  : data?.message || data?.error || '';
+
+          const norm = backendMsg.toLowerCase();
+          const isGeneric =
+              !backendMsg ||
+              norm === 'forbidden' ||
+              norm === 'unauthorized';
+
+          let msg = backendMsg;
+          if (isGeneric) {
+            msg =
+                error.response.status === 403
+                    ? 'Acesso negado.'
+                    : 'Não foi possível validar o login. Tente novamente.';
+          }
+
+          setErrorMsg(msg);
         } else {
-          setErrorMsg("USUÁRIO OU SENHA INVÁLIDOS");
+          setErrorMsg('Não foi possível validar o login. Tente novamente.');
         }
       } else {
-        setErrorMsg("ERRO DE CONEXÃO COM O SERVIDOR");
+        const isTimeout = error?.code === 'ECONNABORTED' || String(error?.message || '').includes('timeout');
+        setErrorMsg(isTimeout ? 'Tempo esgotado: verifique se a API está no ar e o domínio está correto.' : 'ERRO DE CONEXÃO COM O SERVIDOR');
       }
+    } finally {
+      setLoginSubmitting(false);
     }
   };
 
@@ -154,7 +189,9 @@ function Login() {
                     <label htmlFor="passInput"><i className="bi bi-key me-2"></i>Senha</label>
                   </div>
 
-                  <button type="submit" className="btn-login">Acessar Painel</button>
+                  <button type="submit" className="btn-login" disabled={loginSubmitting}>
+                    {loginSubmitting ? 'Entrando…' : 'Acessar Painel'}
+                  </button>
 
                   <div className="mt-3 text-center">
                     <span onClick={() => setIsRecovery(true)} className="forgot-link" style={{ cursor: 'pointer', fontSize: '0.75rem' }}>

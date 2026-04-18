@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -37,6 +38,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         // 🔓 PORTAS ABERTAS: Autenticação e Webhooks
                         .requestMatchers(
                                 "/api/auth/**",
@@ -52,12 +54,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "OWNER")
                         .requestMatchers("/api/pagamentos/comissoes/**").hasAnyRole("ADMIN", "OWNER")
 
-                        // 🛠️ OPERACIONAL (Técnicos e Funcionários): Onde o deslogamento ocorria
-                        // Adicionamos OWNER e ADMIN aqui para que você não seja barrado ao navegar
-                        .requestMatchers("/api/clientes/**").hasAnyRole("ADMIN", "OWNER", "TECNICO", "FUNCIONARIO")
-                        .requestMatchers("/api/servicos/**").hasAnyRole("ADMIN", "OWNER", "TECNICO")
-                        .requestMatchers("/api/vendas/**").hasAnyRole("ADMIN", "OWNER", "FUNCIONARIO")
-                        .requestMatchers("/api/estoque/**").hasAnyRole("ADMIN", "OWNER", "TECNICO")
+                        .requestMatchers("/api/clientes/**").hasAnyRole("ADMIN", "OWNER", "TECNICO", "VENDEDOR")
+                        .requestMatchers("/api/ordens/**").hasAnyRole("ADMIN", "OWNER", "TECNICO", "VENDEDOR")
+                        .requestMatchers("/api/servicos/**").hasAnyRole("ADMIN", "OWNER", "TECNICO", "VENDEDOR")
+                        .requestMatchers("/api/vendas/**").hasAnyRole("ADMIN", "OWNER", "TECNICO", "VENDEDOR")
+                        .requestMatchers("/api/estoque/**").hasAnyRole("ADMIN", "OWNER")
                         .requestMatchers("/api/contas/**").hasAnyRole("ADMIN", "OWNER")
                         .requestMatchers("/api/relatorios/**").hasAnyRole("ADMIN", "OWNER")
 

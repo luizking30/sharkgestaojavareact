@@ -1,5 +1,6 @@
 package com.assistencia.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
@@ -32,6 +33,7 @@ public class Cliente {
     // --- RELACIONAMENTO SaaS (MULTITENANT) ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)
+    @JsonIgnore
     private Empresa empresa;
 
     public Empresa getEmpresa() { return empresa; }

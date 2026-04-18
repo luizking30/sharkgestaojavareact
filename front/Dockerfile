@@ -6,19 +6,12 @@ RUN npm install
 
 COPY . .
 
-# Em build Docker omitimos URL fixa: o front usa o hostname da pagina + porta 4444 (ver src/api.js).
-ARG VITE_API_URL=
+# Produção atrás do Nginx (porta 80): mesma origem. Dev local: omita ou use http://host:4444.
+ARG VITE_API_URL=/
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
-FROM node:20-alpine
-WORKDIR /app
-
-COPY --from=build /app/package*.json ./
-RUN npm install
-
-COPY --from=build /app/dist ./dist
-
-EXPOSE 5173
-
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
+FROM nginx:1.27-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx-docker.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

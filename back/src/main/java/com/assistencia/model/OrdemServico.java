@@ -1,5 +1,7 @@
 package com.assistencia.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -41,11 +43,13 @@ public class OrdemServico {
     // Relacionamento com a classe Usuario (O técnico responsável)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tecnico_id")
+    @JsonIgnoreProperties({"password", "empresa", "resetPasswordToken", "tokenExpiration"})
     private Usuario tecnico;
 
     // --- RELACIONAMENTO SaaS (MULTITENANT) ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)
+    @JsonIgnore
     private Empresa empresa;
 
     public OrdemServico() {

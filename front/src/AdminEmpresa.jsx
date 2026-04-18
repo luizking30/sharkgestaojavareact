@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { Modal } from 'bootstrap';
 import api from './api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFeedback } from './context/FeedbackContext';
+import { useNavigate } from 'react-router-dom';
 
 /** Vite não expõe `window.bootstrap` pelo import do bundle; usar API ESM do pacote. */
 const showBsModal = (el) => {
@@ -58,6 +59,7 @@ const formatWhatsapp = (value) => {
 const AdminEmpresa = ({ usuarioLogado }) => {
     const queryClient = useQueryClient();
     const { notify, confirmDialog } = useFeedback();
+    const navigate = useNavigate();
 
     // --- ESTADOS COM TIPAGEM INICIAL CORRETA ---
     const [statusAssinatura, setStatusAssinatura] = useState({ qr_code: '', qr_code_base64: '', dias_anteriores: 0 });
@@ -65,9 +67,8 @@ const AdminEmpresa = ({ usuarioLogado }) => {
     const [modalData, setModalData] = useState({
         id: 0,
         nome: '',
-        tipo: '',
-        tipoOriginal: '',
         role: '',
+        roleOriginal: '',
         isRoot: false,
         comOs: 0,
         comVenda: 0,
@@ -84,7 +85,8 @@ const AdminEmpresa = ({ usuarioLogado }) => {
         queryFn: async () => {
             const res = await api.get('/api/admin/funcionarios');
             return res.data;
-        }
+        },
+        placeholderData: { usuarios: [], pagamentos: [], empresa: {} }
     });
 
     // Resolvendo os "Unresolved variables" via useMemo
@@ -99,7 +101,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
     }, [empresa?.nome, empresa?.cnpj, empresa?.whatsapp]);
 
     // --- UTILITÁRIOS ---
-    const forceCloseModals = () => {
+    const forceCloseModals = useCallback(() => {
         const backdrops = document.querySelectorAll('.modal-backdrop');
         backdrops.forEach(b => b.remove());
         document.body.classList.remove('modal-open');
@@ -110,7 +112,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
             m.classList.remove('show');
             (m).style.display = 'none';
         });
-    };
+    }, []);
 
     const formatarMoeda = (v) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -121,9 +123,8 @@ const AdminEmpresa = ({ usuarioLogado }) => {
             setModalData({
                 id: Number(u.id),
                 nome: u.nome || '',
-                tipo: u.tipoFuncionario || '',
-                tipoOriginal: u.tipoFuncionario || '',
                 role: String(u.role || ''),
+                roleOriginal: String(u.role || ''),
                 isRoot: Boolean(u.isRoot),
                 comOs: Number(u.comissaoOs) || 0,
                 comVenda: Number(u.comissaoVenda) || 0,
@@ -168,8 +169,12 @@ const AdminEmpresa = ({ usuarioLogado }) => {
     const aprovarMutation = useMutation({
         mutationFn: (id) => api.post(`/api/admin/funcionarios/aprovar/${id}`),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
             notify.success('Colaborador aprovado!', 'Sucesso');
+            try {
+                await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
+            } catch {
+                /* refetch opcional: o POST já concluiu; não esconder o toast de sucesso */
+            }
         },
         onError: () => notify.error('Erro ao aprovar.', 'Erro')
     });
@@ -187,23 +192,26 @@ const AdminEmpresa = ({ usuarioLogado }) => {
         mutationFn: (data) => api.put(`/api/admin/funcionarios/configurar/${data.id}`, data.payload),
         onSuccess: async (_data, variables) => {
             const { id, payload } = variables;
-            const tipo = String(payload?.tipoFuncionario ?? '').trim().toUpperCase();
+            const novaRole = String(payload?.role ?? '').trim().toUpperCase();
             const roleLogadoNorm = String(usuarioLogado?.role || '').trim().toUpperCase();
             const logadoIsOwner = roleLogadoNorm.includes('OWNER');
             const alvoAntes = usuarios.find((u) => Number(u.id) === Number(id));
             const roleAnterior = String(alvoAntes?.role ?? '').toUpperCase();
-            const eraAdminNaoRoot = roleAnterior === 'ROLE_ADMIN' && !alvoAntes?.isRoot;
-            const foiRebaixadoParaFuncionario = eraAdminNaoRoot && tipo !== '' && !tipo.startsWith('PROPRIETARIO');
+            const eraAdminNaoRoot = roleAnterior.includes('ADMIN') && !alvoAntes?.isRoot;
+            const foiRebaixadoOperacional =
+                eraAdminNaoRoot &&
+                novaRole &&
+                (novaRole.includes('TECNICO') || novaRole.includes('VENDEDOR'));
             const selfId =
                 usuarioLogado?.id != null
                     ? Number(usuarioLogado.id) === Number(id)
                     : usuarioLogado?.username &&
                       usuarios.some((u) => Number(u.id) === Number(id) && u.username === usuarioLogado.username);
-            /* Spring recarrega a role no banco a cada request; se você deixa de ser PROPRIETARIO, o próximo GET /api/admin retorna 403 e o axios desloga. ROLE_OWNER continua com acesso (backend não remove). */
+
             const perdeuAcessoPainelEmpresa =
                 selfId &&
-                tipo !== '' &&
-                !tipo.startsWith('PROPRIETARIO') &&
+                novaRole &&
+                (novaRole.includes('TECNICO') || novaRole.includes('VENDEDOR')) &&
                 !logadoIsOwner;
 
             if (perdeuAcessoPainelEmpresa) {
@@ -211,8 +219,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                     const raw = localStorage.getItem('usuarioShark');
                     if (raw) {
                         const u = JSON.parse(raw);
-                        u.tipoFuncionario = payload.tipoFuncionario;
-                        u.role = 'ROLE_FUNCIONARIO';
+                        u.role = payload.role;
                         localStorage.setItem('usuarioShark', JSON.stringify(u));
                     }
                 } catch {
@@ -221,13 +228,13 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                 queryClient.removeQueries({ queryKey: ['admin-dados'] });
                 notify.success('Perfil atualizado. Redirecionando para o seu painel…', 'Sucesso');
                 forceCloseModals();
-                window.location.assign('/meu-painel');
+                navigate('/meu-painel', { replace: true });
                 return;
             }
 
             await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
-            if (foiRebaixadoParaFuncionario) {
-                notify.warning('Administrador rebaixado: role alterada para ROLE_FUNCIONARIO.', 'Aviso');
+            if (foiRebaixadoOperacional) {
+                notify.warning('Administrador rebaixado para perfil operacional (técnico/vendedor).', 'Aviso');
             } else {
                 notify.success('Configurações salvas!', 'Sucesso');
             }
@@ -267,25 +274,25 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                     notify.success('Assinatura atualizada! Recarregando…', 'Shark');
                     await queryClient.invalidateQueries({ queryKey: ['admin-dados'] });
                     forceCloseModals();
-                    setTimeout(() => window.location.reload(), 2000);
+                    setViewMP('selection');
                 }
             } catch (e) { console.error("Erro check pgto", e); }
         }, 5000);
     };
 
-    if (isLoading) return <div className="p-5 text-center text-info"><div className="spinner-border mb-2"></div><p className="val-mono">Sincronizando Shark...</p></div>;
-
     return (
         <div className="mt-2 text-white pb-5">
-            <div className="d-flex justify-content-between align-items-center mb-4">
+            <div className="mb-4">
                 <div>
                     <h2 className="fw-bold"><i className="bi bi-building text-info me-2"></i> Painel da empresa</h2>
                     <p className="text-white-50 small mb-0">Equipe, comissões, assinatura e dados da unidade.</p>
                 </div>
-                <div className="badge bg-dark border border-secondary p-2 val-mono">
-                    <i className="bi bi-calendar3 me-2 text-info"></i>{new Date().toLocaleDateString('pt-BR')}
-                </div>
             </div>
+            {isLoading && (
+                <div className="alert alert-info py-2 small">
+                    <i className="bi bi-arrow-repeat me-2"></i>Sincronizando dados do painel...
+                </div>
+            )}
 
             <div className="card-ganhos-stats border-left-info p-4 mb-4" style={{ background: 'var(--shark-gradient-info)' }}>
                 <div className="row align-items-center text-center text-md-start">
@@ -465,11 +472,14 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                                     <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                                 </div>
                                 <div className="mb-3">
-                                    <label className="label-mini mb-2">Função</label>
-                                    <select className="form-select" value={modalData.tipo} disabled={perfilProtegido} onChange={e => setModalData({...modalData, tipo: e.target.value})}>
-                                        <option value="VENDEDOR">VENDEDOR</option>
-                                        <option value="TECNICO">TÉCNICO</option>
-                                        <option value="PROPRIETARIO">PROPRIETÁRIO (ADMIN)</option>
+                                    <label className="label-mini mb-2">Perfil (role)</label>
+                                    <select className="form-select" value={modalData.role} disabled={perfilProtegido} onChange={e => setModalData({...modalData, role: e.target.value})}>
+                                        {(modalData.role || '').toUpperCase().includes('OWNER') && (
+                                            <option value="ROLE_OWNER">Owner (ecossistema)</option>
+                                        )}
+                                        <option value="ROLE_VENDEDOR">Vendedor</option>
+                                        <option value="ROLE_TECNICO">Técnico</option>
+                                        <option value="ROLE_ADMIN">Administrador da unidade</option>
                                     </select>
                                     {perfilProtegido ? (
                                         <small className="text-warning d-block mt-2">Perfil protegido: cargo não pode ser alterado.</small>
@@ -486,8 +496,8 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                                     </div>
                                 </div>
                                 <button type="button" className="btn btn-info fw-bold w-100 py-2 text-dark" onClick={() => {
-                                    const mudouTipo = String(modalData.tipo || '').trim().toUpperCase() !== String(modalData.tipoOriginal || '').trim().toUpperCase();
-                                    if (perfilProtegido && mudouTipo) {
+                                    const mudouRole = String(modalData.role || '').trim().toUpperCase() !== String(modalData.roleOriginal || '').trim().toUpperCase();
+                                    if (perfilProtegido && mudouRole) {
                                         notify.error('Perfil protegido não pode ter cargo alterado.', 'Bloqueado');
                                         return;
                                     }
@@ -496,7 +506,7 @@ const AdminEmpresa = ({ usuarioLogado }) => {
                                         comissaoVenda: modalData.comVenda
                                     };
                                     if (!perfilProtegido) {
-                                        payload.tipoFuncionario = modalData.tipo;
+                                        payload.role = modalData.role;
                                     }
                                     configMutation.mutate({id: modalData.id, payload});
                                 }}>SALVAR ALTERAÇÕES</button>

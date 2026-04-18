@@ -194,7 +194,7 @@ public class VendasController {
 
     // 5. Deletar (Estorno de Estoque)
     @Transactional
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER')")
     @DeleteMapping("/deletar/{id}")
     public ResponseEntity<?> deletar(@PathVariable Long id) {
         Usuario logado = securityUtils.getUsuarioLogado();

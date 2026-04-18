@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/relatorios")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','OWNER')")
 public class RelatorioController {
 
     @Autowired private VendaRepository vendaRepository;

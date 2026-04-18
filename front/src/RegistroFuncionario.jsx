@@ -7,6 +7,8 @@ function RegistroFuncionario() {
   const navigate = useNavigate();
   const [empresas, setEmpresas] = useState([]);
   const [empresaId, setEmpresaId] = useState('');
+  const [carregandoEmpresas, setCarregandoEmpresas] = useState(true);
+  const [erroEmpresas, setErroEmpresas] = useState('');
   const [erros, setErros] = useState({});
   const [loading, setLoading] = useState(false); // 🦈 Trava anti-flood
   const [formData, setFormData] = useState({
@@ -14,13 +16,20 @@ function RegistroFuncionario() {
   });
 
   useEffect(() => {
+    setCarregandoEmpresas(true);
+    setErroEmpresas('');
     api.get('/api/auth/empresas')
         .then(res => {
-          setEmpresas(res.data);
+          const lista = Array.isArray(res.data) ? res.data : [];
+          lista.sort((a, b) => Number(a.id) - Number(b.id));
+          setEmpresas(lista);
         })
         .catch(err => {
           console.error("Erro ao carregar empresas do banco de dados", err);
-        });
+          setEmpresas([]);
+          setErroEmpresas('Não foi possível carregar as empresas. Atualize a página ou tente mais tarde.');
+        })
+        .finally(() => setCarregandoEmpresas(false));
   }, []);
 
   const handleInputChange = (e) => {
@@ -44,16 +53,6 @@ function RegistroFuncionario() {
     }
 
     setFormData({ ...formData, [name]: val });
-  };
-
-  const handleEmpresaSearch = (e) => {
-    const val = e.target.value;
-    const empresaEncontrada = empresas.find(emp => `${emp.id} - ${emp.nome}` === val);
-    if (empresaEncontrada) {
-      setEmpresaId(empresaEncontrada.id);
-    } else {
-      setEmpresaId('');
-    }
   };
 
   const validarAntesDeEnviar = () => {
@@ -81,9 +80,20 @@ function RegistroFuncionario() {
     try {
       await api.post(`/api/auth/registro-funcionario?empresaId=${empresaId}`, formData);
 
+      try {
+        localStorage.removeItem('usuarioShark');
+      } catch {
+        /* ignore */
+      }
+      window.dispatchEvent(new Event('auth:logout'));
+
       // 🦈 SHARK UPDATE: Removido alert e enviando state para o card verde no Login
       navigate('/', {
-        state: { successMsg: "Solicitação enviada! Aguarde a aprovação do seu gestor." }
+        replace: true,
+        state: {
+          successMsg:
+              'Solicitação enviada! Seu cadastro foi registrado e aguarda aprovação do administrador da empresa. Quando for aprovado, você poderá acessar com seu login e senha.'
+        }
       });
 
     } catch (error) {
@@ -133,20 +143,26 @@ function RegistroFuncionario() {
 
           <form onSubmit={handleSubmit}>
             <div className="mb-3 text-start empresa-search-container">
-              <label className="small text-info ms-2 mb-1 fw-bold">DIGITE O NOME OU ID DA EMPRESA *</label>
-              <input
-                  list="empresasOptions"
-                  className={`form-control p-3 ${erros.empresa ? 'is-invalid-shark' : ''}`}
-                  placeholder="Comece a digitar..."
-                  onChange={handleEmpresaSearch}
-                  autoComplete="off"
-                  disabled={loading}
-              />
-              <datalist id="empresasOptions">
+              <label htmlFor="empresaSelect" className="small text-info ms-2 mb-1 fw-bold">SELECIONE A EMPRESA *</label>
+              <select
+                  id="empresaSelect"
+                  className={`form-select p-3 ${erros.empresa ? 'is-invalid-shark' : ''}`}
+                  value={empresaId}
+                  onChange={(e) => setEmpresaId(e.target.value)}
+                  disabled={loading || carregandoEmpresas || !!erroEmpresas || empresas.length === 0}
+              >
+                <option value="">
+                  {carregandoEmpresas ? 'Carregando empresas...' : empresas.length === 0 ? 'Nenhuma empresa cadastrada' : 'Escolha a empresa (ID e nome)'}
+                </option>
                 {empresas.map(emp => (
-                    <option key={emp.id} value={`${emp.id} - ${emp.nome}`} />
+                    <option key={emp.id} value={String(emp.id)}>
+                      #{emp.id} — {emp.nome || 'Sem nome'}
+                    </option>
                 ))}
-              </datalist>
+              </select>
+              {erroEmpresas && (
+                  <div className="small text-warning mt-2 fw-bold">{erroEmpresas}</div>
+              )}
               {erros.empresa && <span className="invalid-msg">{erros.empresa}</span>}
             </div>
 

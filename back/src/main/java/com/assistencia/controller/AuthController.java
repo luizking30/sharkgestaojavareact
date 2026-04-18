@@ -9,14 +9,14 @@ import com.assistencia.repository.EmpresaRepository;
 import com.assistencia.service.EmailService;
 import com.assistencia.service.WhatsappService;
 import com.assistencia.util.CpfValidator;
+import com.assistencia.util.SecurityUtils;
 import com.assistencia.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +33,8 @@ public class AuthController {
     @Autowired private EmailService emailService;
     @Autowired private WhatsappService whatsappService;
     @Autowired private JwtService jwtService;
-    @Autowired private AuthenticationManager authenticationManager;
+    @Autowired private UserDetailsService userDetailsService;
+    @Autowired private SecurityUtils securityUtils;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginDTO dados) {
@@ -41,28 +42,51 @@ public class AuthController {
         Usuario user = usuarioRepository.findByUsername(dados.username())
                 .orElse(null);
 
+        // Retorno imediato para usuário inexistente: evita a lentidão da primeira tentativa inválida.
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Usuário não encontrado!");
+        }
+
         // Se o usuário existir, verificamos se ele já foi aceito pelo dono da loja
-        if (user != null && !user.isAprovado()) {
+        if (!user.isAprovado()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("O proprietário da empresa ainda não aprovou sua conta.");
         }
 
-        // 2. Autenticação Oficial via Spring Security (Valida Senha)
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dados.username(), dados.password())
-        );
+        UserDetails principal = userDetailsService.loadUserByUsername(dados.username());
+        if (dados.password() == null || !passwordEncoder.matches(dados.password(), principal.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Senha incorreta!");
+        }
 
         // 3. Se chegou aqui, o usuário existe e a senha está correta
-        String token = jwtService.generateToken((org.springframework.security.core.userdetails.UserDetails) authentication.getPrincipal());
+        String token = jwtService.generateToken(principal);
 
-        // 4. Resposta Definitiva
+        return ResponseEntity.ok(montarPayloadSessao(user, token));
+    }
+
+    /**
+     * Atualiza role/tipo/empresa a partir do banco (evita localStorage desatualizado no front).
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> sessaoAtual() {
+        Usuario user = securityUtils.getUsuarioLogado();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(montarPayloadSessao(user, null));
+    }
+
+    private Map<String, Object> montarPayloadSessao(Usuario user, String token) {
         Map<String, Object> response = new HashMap<>();
-        response.put("token", token);
+        if (token != null) {
+            response.put("token", token);
+        }
         response.put("id", user.getId());
         response.put("username", user.getUsername());
         response.put("role", user.getRole());
         response.put("nome", user.getNome());
-        response.put("tipoFuncionario", user.getTipoFuncionario());
 
         Map<String, Object> empresaMap = new HashMap<>();
         empresaMap.put("id", user.getEmpresa().getId());
@@ -74,7 +98,7 @@ public class AuthController {
 
         response.put("empresa", empresaMap);
 
-        return ResponseEntity.ok(response);
+        return response;
     }
 
     @GetMapping("/empresas")
@@ -107,7 +131,7 @@ public class AuthController {
                     .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
 
             usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
-            usuario.setRole("ROLE_FUNCIONARIO");
+            usuario.setRole("ROLE_VENDEDOR");
             usuario.setAprovado(false);
             usuario.setEmpresa(emp);
 
@@ -195,7 +219,6 @@ public class AuthController {
 
             usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
             usuario.setRole("ROLE_ADMIN");
-            usuario.setTipoFuncionario("PROPRIETARIO");
             usuario.setAprovado(true);
             usuario.setEmpresa(salva);
 

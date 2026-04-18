@@ -47,15 +47,14 @@ public class SuperAdminController {
                 dadosEmpresa.put("cnpj", emp.getCnpj() != null ? emp.getCnpj() : "NÃO INFORMADO");
                 dadosEmpresa.put("diasRestantes", emp.getDiasRestantes());
 
-                // Filtra quem são os cabeças (donos) da unidade
+                // Administradores principais da unidade (root)
                 List<String> proprietarios = vinculos.stream()
-                        .filter(u -> "PROPRIETARIO".equals(u.getTipoFuncionario()))
+                        .filter(Usuario::isRoot)
                         .map(Usuario::getNome)
                         .collect(Collectors.toList());
 
-                // Lista de nomes de todos os funcionários (incluindo técnicos e vendedores)
                 List<String> equipeCompleta = vinculos.stream()
-                        .map(u -> u.getNome() + " (" + (u.getTipoFuncionario() != null ? u.getTipoFuncionario() : "COMUM") + ")")
+                        .map(u -> u.getNome() + " (" + (u.getRole() != null ? u.getRole().replace("ROLE_", "") : "—") + ")")
                         .collect(Collectors.toList());
 
                 dadosEmpresa.put("proprietarios", proprietarios);

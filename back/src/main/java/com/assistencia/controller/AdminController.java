@@ -68,8 +68,40 @@ public class AdminController {
         List<Venda> todasVendas = vendaRepo.findByEmpresaIdOrderByDataHoraDesc(empresaId);
         List<PagamentoComissao> todosPagamentos = pagamentoRepo.findByEmpresaIdOrderByDataHoraDesc(empresaId);
 
+        Map<Long, List<PagamentoComissao>> pagamentosPorFuncionario = new HashMap<>();
+        for (PagamentoComissao pagamento : todosPagamentos) {
+            if (pagamento.getFuncionarioId() == null) continue;
+            pagamentosPorFuncionario
+                    .computeIfAbsent(pagamento.getFuncionarioId(), key -> new ArrayList<>())
+                    .add(pagamento);
+        }
+
+        Map<Long, List<Venda>> vendasPorVendedor = new HashMap<>();
+        for (Venda venda : todasVendas) {
+            if (venda.getVendedor() == null || venda.getVendedor().getId() == null) continue;
+            vendasPorVendedor
+                    .computeIfAbsent(venda.getVendedor().getId(), key -> new ArrayList<>())
+                    .add(venda);
+        }
+
+        Map<String, List<OrdemServico>> ordensEntreguesPorTecnico = new HashMap<>();
+        for (OrdemServico ordem : todasOrdens) {
+            if (!"Entregue".equalsIgnoreCase(ordem.getStatus())) continue;
+            if (ordem.getFuncionarioAndamento() == null || ordem.getDataEntrega() == null) continue;
+            String tecnicoKey = ordem.getFuncionarioAndamento().trim().toLowerCase();
+            if (tecnicoKey.isEmpty()) continue;
+            ordensEntreguesPorTecnico
+                    .computeIfAbsent(tecnicoKey, key -> new ArrayList<>())
+                    .add(ordem);
+        }
+
         for (Usuario u : usuarios) {
-            calcularComissoes(u, todasOrdens, todasVendas, todosPagamentos);
+            List<PagamentoComissao> pagamentosDoUsuario = pagamentosPorFuncionario.getOrDefault(u.getId(), Collections.emptyList());
+            List<Venda> vendasDoUsuario = vendasPorVendedor.getOrDefault(u.getId(), Collections.emptyList());
+            String tecnicoKey = (u.getNome() != null) ? u.getNome().trim().toLowerCase() : "";
+            List<OrdemServico> ordensDoTecnico = ordensEntreguesPorTecnico.getOrDefault(tecnicoKey, Collections.emptyList());
+
+            calcularComissoes(u, ordensDoTecnico, vendasDoUsuario, pagamentosDoUsuario);
         }
 
         Map<String, Object> response = new HashMap<>();
@@ -195,40 +227,35 @@ public class AdminController {
                         return ResponseEntity.status(403).body("Privilégios do Administrador Raiz são protegidos.");
                     }
 
-                    if (payload.get("tipoFuncionario") != null) {
-                        String novoTipo = payload.get("tipoFuncionario").toString().trim().toUpperCase();
+                    if (payload.get("role") != null) {
+                        String nova = payload.get("role").toString().trim().toUpperCase();
+                        if (!nova.startsWith("ROLE_")) {
+                            nova = "ROLE_" + nova;
+                        }
                         String roleAtual = (u.getRole() == null) ? "" : u.getRole().trim().toUpperCase();
-                        boolean rebaixandoCargo = !"PROPRIETARIO".equals(novoTipo);
                         boolean isOwner = roleAtual.contains("OWNER");
-                        boolean isAdmin = "ROLE_ADMIN".equals(roleAtual) || "ADMIN".equals(roleAtual);
+                        boolean isAdminUnidade = roleAtual.contains("ADMIN");
+                        boolean rebaixandoDeAdmin =
+                                isAdminUnidade && !nova.contains("ADMIN") && !isOwner;
 
-                        // Trava absoluta: root nunca sai do cargo PROPRIETARIO.
-                        if (u.isRoot() && rebaixandoCargo) {
+                        if (!nova.matches("ROLE_(OWNER|ADMIN|TECNICO|VENDEDOR)")) {
+                            return ResponseEntity.badRequest().body("Role inválida.");
+                        }
+
+                        if (u.isRoot() && rebaixandoDeAdmin) {
                             return ResponseEntity.status(403).body("Perfil root é protegido e não pode ser rebaixado.");
                         }
 
-                        // Regra 1: OWNER nunca pode ser rebaixado de cargo.
-                        if (isOwner && rebaixandoCargo) {
+                        if (isOwner && !nova.contains("OWNER")) {
                             return ResponseEntity.status(403).body("Usuário OWNER não pode ser rebaixado para outro cargo.");
                         }
 
-                        // Regra 2: ADMIN com root=true também não pode ser rebaixado.
-                        if (isAdmin && u.isRoot() && rebaixandoCargo) {
+                        if (isAdminUnidade && u.isRoot() && rebaixandoDeAdmin) {
                             return ResponseEntity.status(403).body("Administrador principal (root) não pode ser rebaixado.");
                         }
 
-                        // Aplica novo tipo e role conforme regra.
-                        u.setTipoFuncionario(novoTipo);
-                        if ("PROPRIETARIO".equals(novoTipo)) {
-                            // Promove para admin da unidade sem sobrescrever OWNER.
-                            if (!isOwner) {
-                                u.setRole("ROLE_ADMIN");
-                            }
-                        } else {
-                            // ADMIN root=false pode ser rebaixado para funcionário.
-                            if (!isOwner && !u.isRoot()) {
-                                u.setRole("ROLE_FUNCIONARIO");
-                            }
+                        if (!isOwner) {
+                            u.setRole(nova);
                         }
                     }
 
@@ -264,7 +291,7 @@ public class AdminController {
                     return ResponseEntity.status(403).body("Este perfil administrativo protegido não pode ter cargo alterado por aprovação.");
                 }
                 u.setAprovado(true);
-                u.setRole("ROLE_FUNCIONARIO");
+                u.setRole("ROLE_VENDEDOR");
                 usuarioRepo.save(u);
 
                 emailService.enviarEmailAprovacaoFuncionario(
@@ -290,35 +317,28 @@ public class AdminController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    private void calcularComissoes(Usuario u, List<OrdemServico> todasOrdens, List<Venda> todasVendas, List<PagamentoComissao> todosPagamentos) {
+    private void calcularComissoes(Usuario u, List<OrdemServico> ordensDoTecnico, List<Venda> vendasDoUsuario, List<PagamentoComissao> pagamentosDoUsuario) {
         final Long idU = u.getId();
-        final String nomeU = (u.getNome() != null) ? u.getNome().trim() : "";
-
-        LocalDateTime corteOs = todosPagamentos.stream()
+        LocalDateTime corteOs = pagamentosDoUsuario.stream()
                 .filter(p -> Objects.equals(p.getFuncionarioId(), idU) && "OS".equals(p.getTipoComissao()))
                 .map(PagamentoComissao::getDataHora).max(LocalDateTime::compareTo)
                 .orElse(LocalDateTime.of(2000, 1, 1, 0, 0));
 
-        LocalDateTime corteVenda = todosPagamentos.stream()
+        LocalDateTime corteVenda = pagamentosDoUsuario.stream()
                 .filter(p -> Objects.equals(p.getFuncionarioId(), idU) && "VENDA".equals(p.getTipoComissao()))
                 .map(PagamentoComissao::getDataHora).max(LocalDateTime::compareTo)
                 .orElse(LocalDateTime.of(2000, 1, 1, 0, 0));
 
-        List<Venda> vendasPendentes = todasVendas.stream()
-                .filter(v -> v.getVendedor() != null && Objects.equals(v.getVendedor().getId(), idU))
+        List<Venda> vendasPendentes = vendasDoUsuario.stream()
                 .filter(v -> v.getDataHora().isAfter(corteVenda)).toList();
 
         BigDecimal comissaoVenda = vendasPendentes.stream()
                 .map(v -> BigDecimal.valueOf(v.getComissaoVendedorValor() != null ? v.getComissaoVendedorValor() : 0.0))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<OrdemServico> ordensPendentes = todasOrdens.stream()
-                .filter(os -> {
-                    boolean entregue = "Entregue".equalsIgnoreCase(os.getStatus());
-                    String tecnico = (os.getFuncionarioAndamento() != null) ? os.getFuncionarioAndamento().trim() : "";
-                    return entregue && tecnico.equalsIgnoreCase(nomeU);
-                })
-                .filter(os -> os.getDataEntrega() != null && os.getDataEntrega().isAfter(corteOs)).toList();
+        List<OrdemServico> ordensPendentes = ordensDoTecnico.stream()
+                .filter(os -> os.getDataEntrega().isAfter(corteOs))
+                .toList();
 
         BigDecimal comissaoOs = ordensPendentes.stream()
                 .map(os -> BigDecimal.valueOf(os.getComissaoTecnicoValor() != null ? os.getComissaoTecnicoValor() : 0.0))

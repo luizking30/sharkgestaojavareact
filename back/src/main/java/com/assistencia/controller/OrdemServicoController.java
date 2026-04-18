@@ -44,7 +44,12 @@ public class OrdemServicoController {
         this.usuarioRepo = usuarioRepo;
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO','OWNER')")
+    private boolean isVendedor(Usuario u) {
+        if (u == null || u.getRole() == null) return false;
+        return u.getRole().toUpperCase().contains("VENDEDOR");
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")
     @GetMapping
     public ResponseEntity<?> listar(
             @RequestParam(required = false) String busca,
@@ -81,7 +86,7 @@ public class OrdemServicoController {
         return ResponseEntity.ok(ordemRepo.findByEmpresaFiltrado(empresaId, idFiltro, nomeF, statusF, d0, d1, pageable));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")
     @PostMapping("/salvar")
     public ResponseEntity<?> salvar(@RequestBody Map<String, Object> payload) {
         try {
@@ -93,6 +98,10 @@ public class OrdemServicoController {
             String defeito = payload.get("defeito").toString();
             String status = payload.get("status").toString();
             Double valor = Double.valueOf(payload.get("valor").toString());
+
+            if (isVendedor(logado) && "Entregue".equalsIgnoreCase(status)) {
+                return ResponseEntity.status(403).body("Vendedor não pode registrar O.S. como entregue.");
+            }
 
             Cliente c = clienteRepo.findById(clienteId)
                     .filter(cli -> cli.getEmpresa().getId().equals(logado.getEmpresa().getId()))
@@ -127,7 +136,7 @@ public class OrdemServicoController {
         }
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")
     @PutMapping("/editar-status/{id}") // MUDOU: Usando PUT para atualização
     public ResponseEntity<?> editarStatus(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
         try {
@@ -135,6 +144,9 @@ public class OrdemServicoController {
             OrdemServico os = ordemRepo.findById(id).orElseThrow();
 
             String status = payload.get("status").toString();
+            if (isVendedor(logado) && "Entregue".equalsIgnoreCase(status)) {
+                return ResponseEntity.status(403).body("Vendedor não pode marcar O.S. como entregue.");
+            }
             Double custoPeca = Double.valueOf(payload.get("custoPeca").toString());
 
             if (!os.getEmpresa().getId().equals(logado.getEmpresa().getId())) {
@@ -171,7 +183,7 @@ public class OrdemServicoController {
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER')")
     @DeleteMapping("/deletar/{id}")
     public ResponseEntity<?> deletar(@PathVariable Long id) {
         Usuario logado = securityUtils.getUsuarioLogado();
@@ -183,7 +195,7 @@ public class OrdemServicoController {
                 }).orElse(ResponseEntity.status(403).build());
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','FUNCIONARIO')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")
     @GetMapping("/pdf/{id}")
     public ResponseEntity<byte[]> gerarPdf(@PathVariable Long id) {
         try {

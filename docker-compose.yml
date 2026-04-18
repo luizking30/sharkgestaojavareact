@@ -1,14 +1,22 @@
 services:
+  # Produção: o Nginx do host serve /var/www/sharkgestao/dist — não subir este serviço no dia a dia.
+  # Opcional: docker compose --profile front-container up -d front
   front:
+    profiles:
+      - front-container
     build:
       context: ./front
       dockerfile: Dockerfile
     container_name: shark-front
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - api
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   api:
     build:
@@ -26,19 +34,30 @@ services:
       - DB_PASSWORD=123456
       # Rede interna Docker (mesmo valor esperado em back/.env quando a API roda no compose).
       - EVOLUTION_BASE_URL=http://evolution-api:8080
+      # Limita heap JVM em hosts com pouca RAM (ajuste no compose se precisar mais).
+      - "JAVA_OPTS=-Xms128m -Xmx256m"
     depends_on:
       evolution-api:
         condition: service_started
       shark-db:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 300M
 
   shark-db:
     image: mysql:8.0
     container_name: shark-db
+    # Host 3310: evita conflito com MySQL nativo do servidor na 3306.
     ports:
-      - "3306:3306"
-    command: --default-authentication-plugin=mysql_native_password --skip-name-resolve
+      - "3310:3306"
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --skip-name-resolve
+      --innodb-buffer-pool-size=64M
+      --innodb-log-buffer-size=1M
     environment:
       - TZ=America/Sao_Paulo
       - MYSQL_ROOT_PASSWORD=123456
@@ -53,6 +72,10 @@ services:
       retries: 30
       start_period: 20s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 300M
 
   evolution-api:
     # v2.2.3 (atendai) chegou com schema Prisma desalinhado do MySQL (ex.: coluna wavoipToken) — manager vazio / create 400.
@@ -60,11 +83,11 @@ services:
     image: atendai/evolution-api:v2.1.2
     container_name: evolution-api
     command: >
-      /bin/bash -c "sed -i 's/path:\\[\"id\"\\]/path:\"$.id\"/g; s/path:\\[\"fromMe\"\\]/path:\"$.fromMe\"/g; s/path:\\[\"remoteJid\"\\]/path:\"$.remoteJid\"/g; s/path:\\[\"participants\"\\]/path:\"$.participants\"/g' /evolution/dist/main.js &&
+      /bin/bash -c "sed -i 's/path:\\[\"id\"\\]/path:\"$$.id\"/g; s/path:\\[\"fromMe\"\\]/path:\"$$.fromMe\"/g; s/path:\\[\"remoteJid\"\\]/path:\"$$.remoteJid\"/g; s/path:\\[\"participants\"\\]/path:\"$$.participants\"/g' /evolution/dist/main.js &&
       . ./Docker/scripts/deploy_database.sh &&
       npm run start:prod"
     ports:
-      - "8090:8080"
+      - "127.0.0.1:8090:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     dns:
@@ -76,7 +99,8 @@ services:
       # URL pública do Manager/QR. No celular na mesma rede, prefira http://SEU_IP_LAN:8090
       # (defina SERVER_URL num arquivo .env na pasta deste compose, ou exporte antes do up).
       # Celular na rede: exporte SERVER_URL=http://SEU_IP_LAN:8090 antes do up. Desktop: host.docker.internal.
-      - SERVER_URL=${SERVER_URL:-http://host.docker.internal:8090}
+      # Valor vem do arquivo .env na raiz do compose (SERVER_URL=...). Evita ${VAR:-default}, incompatível com docker-compose 1.25.
+      - SERVER_URL=${SERVER_URL}
       # Ajuda QR/pairing via REST em algumas builds v2.1.x (ver EvolutionAPI/evolution-api#2385)
       - QRCODE_LIMIT=30
       - QRCODE_COLOR=#198754
@@ -101,6 +125,10 @@ services:
       evolution-redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 300M
 
   evolution-db:
     image: mysql:8.0
@@ -109,7 +137,11 @@ services:
     # Dentro da rede Docker a Evolution continua em evolution-db:3306.
     ports:
       - "3307:3306"
-    command: --default-authentication-plugin=mysql_native_password --skip-name-resolve
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --skip-name-resolve
+      --innodb-buffer-pool-size=64M
+      --innodb-log-buffer-size=1M
     environment:
       - TZ=America/Sao_Paulo
       - MYSQL_ROOT_PASSWORD=123456
@@ -124,6 +156,10 @@ services:
       retries: 30
       start_period: 20s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 300M
 
   evolution-redis:
     image: redis:7-alpine
@@ -140,6 +176,10 @@ services:
       retries: 20
       start_period: 5s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 300M
 
 volumes:
   shark_mysql_data:

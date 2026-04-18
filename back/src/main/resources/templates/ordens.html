@@ -395,8 +395,10 @@
             // --- LÓGICA DE ALTERAÇÃO DE STATUS E CÁLCULO DE LUCRO ---
             document.querySelectorAll('.status-select-ajax').forEach(select => {
                 const isAdmin = [[${#authorization.expression('hasRole(''ADMIN'')')}]];
-                const tipoFuncionario = [[${usuarioLogado != null ? usuarioLogado.tipoFuncionario : ''}]];
-                const podeOperarLaboratorio = isAdmin || tipoFuncionario === 'TECNICO' || tipoFuncionario === 'HIBRIDO';
+                const isOwner = [[${#authorization.expression('hasRole(''OWNER'')')}]];
+                const isTec = [[${#authorization.expression('hasRole(''TECNICO'')')}]];
+                const isVen = [[${#authorization.expression('hasRole(''VENDEDOR'')')}]];
+                const podeOperarLaboratorio = isAdmin || isOwner || isTec || isVen;
 
                 select.addEventListener('change', function() {
                     const id = this.getAttribute('data-id');
@@ -429,6 +431,12 @@
                     if (statusAtual === 'Entregue') {
                         alert("Esta O.S. já foi finalizada!");
                         this.value = 'Entregue';
+                        return;
+                    }
+
+                    if (novoStatus === 'Entregue' && isVen) {
+                        alert("Vendedor não pode marcar O.S. como entregue.");
+                        this.value = statusAtual;
                         return;
                     }
 

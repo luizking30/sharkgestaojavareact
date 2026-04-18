@@ -709,7 +709,7 @@ body {
     color: rgba(255, 255, 255, 0.88) !important;
 }
 
-/* Modais Bootstrap acima do layout e da shark-feedback-layer */
+/* Modais Bootstrap acima do layout; toasts (.shark-feedback-layer) ficam acima do backdrop do modal */
 .modal {
     z-index: 30500 !important;
 }
@@ -723,7 +723,8 @@ body {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 30000;
+    /* Acima de .modal-backdrop (30490) para toasts não ficarem “atrás” durante modais/sync */
+    z-index: 30600;
 }
 
 .shark-toast-stack {
@@ -735,7 +736,7 @@ body {
     flex-direction: column;
     gap: 0.5rem;
     pointer-events: none;
-    z-index: 30001;
+    z-index: 30601;
 }
 
 .shark-feedback-card {
@@ -795,7 +796,7 @@ body {
     justify-content: center;
     padding: 1rem;
     pointer-events: auto;
-    z-index: 30002;
+    z-index: 30602;
 }
 
 .shark-feedback-modal {

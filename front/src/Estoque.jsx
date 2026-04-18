@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import api from './api';
 import { unwrapPage } from './utils/pageResponse';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import SharkPagination from './components/SharkPagination';
 import { useFeedback } from './context/FeedbackContext';
+import { podeGerirEstoque } from './auth/accessRules';
 
 const PAGE_SIZE = 20;
 
@@ -22,9 +23,9 @@ const Estoque = ({ usuarioLogado }) => {
         quantidade: 1
     });
     const [editando, setEditando] = useState(false);
-    const isAdmin = usuarioLogado?.role === 'ROLE_ADMIN';
+    const podeGerir = podeGerirEstoque(usuarioLogado?.role);
 
-    const { data: pageData, isLoading } = useQuery({
+    const { data: pageData, isLoading, isFetching } = useQuery({
         queryKey: ['estoque-produtos', page],
         queryFn: async () => {
             const response = await api.get('/api/estoque', {
@@ -32,6 +33,7 @@ const Estoque = ({ usuarioLogado }) => {
             });
             return unwrapPage(response.data);
         },
+        placeholderData: keepPreviousData,
     });
 
     const produtos = pageData?.items ?? [];
@@ -98,7 +100,7 @@ const Estoque = ({ usuarioLogado }) => {
     };
 
     const prepararEdicao = (produto) => {
-        if (!isAdmin) {
+        if (!podeGerir) {
             notify.warning('Somente administradores podem editar o estoque.', 'Permissão');
             return;
         }
@@ -114,7 +116,7 @@ const Estoque = ({ usuarioLogado }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!isAdmin) {
+        if (!podeGerir) {
             notify.warning('Somente administradores podem alterar o estoque.', 'Permissão');
             return;
         }
@@ -122,7 +124,7 @@ const Estoque = ({ usuarioLogado }) => {
     };
 
     const handleDeletar = async (id) => {
-        if (!isAdmin) {
+        if (!podeGerir) {
             notify.warning('Somente administradores podem excluir itens.', 'Permissão');
             return;
         }
@@ -171,7 +173,7 @@ const Estoque = ({ usuarioLogado }) => {
                         </div>
                         <div className="col-md-2">
                             <div className="d-flex gap-2">
-                                <button type="submit" disabled={saveMutation.isPending} className={`btn btn-shark-primary w-100 ${!isAdmin ? 'btn-readonly' : ''}`}>
+                                <button type="submit" disabled={saveMutation.isPending} className={`btn btn-shark-primary w-100 ${!podeGerir ? 'btn-readonly' : ''}`}>
                                     <i className={editando ? "bi bi-check-lg" : "bi bi-plus-circle"}></i> {editando ? 'ATUALIZAR' : 'SALVAR'}
                                 </button>
                                 {editando && (
@@ -221,7 +223,7 @@ const Estoque = ({ usuarioLogado }) => {
                         </tr>
                         </thead>
                         <tbody>
-                        {isLoading ? (
+                        {isLoading && !pageData ? (
                             <tr><td colSpan={7} className="text-center py-4 text-info">Carregando…</td></tr>
                         ) : (
                         produtos.map(p => (
@@ -235,10 +237,10 @@ const Estoque = ({ usuarioLogado }) => {
                                 <td className="text-center">
                                     <div className="btn-group gap-1">
                                         <button onClick={() => prepararEdicao(p)}
-                                                className={`btn btn-sm btn-outline-info ${!isAdmin ? 'btn-readonly' : ''}`}>
+                                                className={`btn btn-sm btn-outline-info ${!podeGerir ? 'btn-readonly' : ''}`}>
                                             <i className="bi bi-pencil-square"></i>
                                         </button>
-                                        {isAdmin && (
+                                        {podeGerir && (
                                             <button onClick={() => handleDeletar(p.id)} className="btn btn-sm btn-outline-danger" disabled={deleteMutation.isPending}>
                                                 <i className="bi bi-trash"></i>
                                             </button>
@@ -259,7 +261,7 @@ const Estoque = ({ usuarioLogado }) => {
                 totalElements={totalElements}
                 pageSize={PAGE_SIZE}
                 onPageChange={setPage}
-                disabled={isLoading}
+                disabled={isFetching}
             />
         </div>
     );

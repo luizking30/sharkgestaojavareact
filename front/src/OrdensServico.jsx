@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from './api';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { debounce } from './utils/debounce';
 import { unwrapPage } from './utils/pageResponse';
 import SharkPagination from './components/SharkPagination';
 import { useFeedback } from './context/FeedbackContext';
+import {
+    forbidExcluirOrdemServico,
+    forbidEntregarOs,
+} from './auth/accessRules';
 
 const OS_PAGE_SIZE = 15;
 
@@ -21,7 +25,7 @@ const OrdensServico = ({ usuarioLogado }) => {
         setPage(0);
     }, [filtros.id, filtros.nome, filtros.data, filtros.status]);
 
-    const { data: pageData, isLoading } = useQuery({
+    const { data: pageData, isLoading, isFetching } = useQuery({
         queryKey: ['ordens-servico', page, filtros.id, filtros.nome, filtros.data, filtros.status],
         queryFn: async () => {
             const params = {
@@ -44,6 +48,7 @@ const OrdensServico = ({ usuarioLogado }) => {
             const res = await api.get('/api/ordens', { params });
             return unwrapPage(res.data);
         },
+        placeholderData: keepPreviousData,
     });
 
     const ordens = pageData?.items ?? [];
@@ -61,8 +66,8 @@ const OrdensServico = ({ usuarioLogado }) => {
         valor: ''
     });
 
-    const isAdmin = usuarioLogado?.role === 'ROLE_ADMIN';
-    const podeOperarLaboratorio = isAdmin || usuarioLogado?.tipoFuncionario === 'TECNICO' || usuarioLogado?.tipoFuncionario === 'HIBRIDO';
+    const naoPodeEntregar = forbidEntregarOs(usuarioLogado?.role);
+    const podeExcluirOs = !forbidExcluirOrdemServico(usuarioLogado?.role);
 
     const debouncedBuscarClientes = useMemo(
         () =>
@@ -103,6 +108,10 @@ const OrdensServico = ({ usuarioLogado }) => {
 
     // --- LÓGICA DE STATUS ---
     const handleStatusChange = async (ordem, novoStatus) => {
+        if (novoStatus === 'Entregue' && naoPodeEntregar) {
+            notify.warning('Vendedor não pode entregar O.S. Conclua os passos até "Pronto" e um gestor ou técnico fará a entrega.', 'Permissão');
+            return;
+        }
         const hierarquia = ['Em análise', 'Em andamento', 'Pronto', 'Entregue'];
         const idxAtual = hierarquia.indexOf(ordem.status);
         const idxNovo = hierarquia.indexOf(novoStatus);
@@ -113,11 +122,6 @@ const OrdensServico = ({ usuarioLogado }) => {
         }
         if (idxNovo > idxAtual + 1) {
             notify.warning(`A O.S. deve passar por "${hierarquia[idxAtual + 1]}" antes.`, 'Status');
-            return;
-        }
-
-        if ((novoStatus === 'Em andamento' || novoStatus === 'Pronto') && !podeOperarLaboratorio) {
-            notify.warning('Somente técnicos ou administradores podem alterar este status.', 'Permissão');
             return;
         }
 
@@ -165,6 +169,10 @@ const OrdensServico = ({ usuarioLogado }) => {
 
     // --- DELETAR O.S. ---
     const handleDeletar = async (id) => {
+        if (!podeExcluirOs) {
+            notify.warning('Apenas gestores da unidade podem excluir O.S.', 'Permissão');
+            return;
+        }
         const ok = await confirmDialog('Deseja realmente excluir esta ordem de serviço?', 'Excluir O.S.');
         if (!ok) return;
         try {
@@ -297,7 +305,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                         </tr>
                         </thead>
                         <tbody>
-                        {isLoading ? (
+                        {isLoading && !pageData ? (
                             <tr><td colSpan={6} className="text-center py-4 text-info">Carregando…</td></tr>
                         ) : (
                         ordens.map(o => (
@@ -338,7 +346,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                                         <option value="Em análise">Em análise</option>
                                         <option value="Em andamento">Em andamento</option>
                                         <option value="Pronto">Pronto</option>
-                                        <option value="Entregue">Entregue/Pago</option>
+                                        <option value="Entregue" disabled={naoPodeEntregar && o.status !== 'Entregue'}>Entregue/Pago</option>
                                     </select>
                                 </td>
                                 <td className="text-center">
@@ -346,7 +354,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                                         <button className="btn btn-sm btn-outline-info" onClick={() => imprimirPDF(o.id)}>
                                             <i className="bi bi-file-earmark-pdf"></i>
                                         </button>
-                                        {isAdmin && (
+                                        {podeExcluirOs && (
                                             <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeletar(o.id)}>
                                                 <i className="bi bi-trash"></i>
                                             </button>
@@ -367,7 +375,7 @@ const OrdensServico = ({ usuarioLogado }) => {
                 totalElements={totalElements}
                 pageSize={OS_PAGE_SIZE}
                 onPageChange={setPage}
-                disabled={isLoading}
+                disabled={isFetching}
             />
         </div>
     );

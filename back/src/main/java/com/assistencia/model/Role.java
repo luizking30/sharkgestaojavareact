@@ -1,7 +1,9 @@
 package com.assistencia.model;
 
+/** Referência documental; autoridades reais vêm da coluna {@code usuarios.role}. */
 public enum Role {
-    ROLE_OWNER,       // Super usuário do SaaS (Você)
-    ROLE_ADMIN,       // Dono da unidade (O criador da empresa)
-    ROLE_FUNCIONARIO  // Colaborador padrão (Técnico/Vendedor)
+    ROLE_OWNER,
+    ROLE_ADMIN,
+    ROLE_TECNICO,
+    ROLE_VENDEDOR
 }

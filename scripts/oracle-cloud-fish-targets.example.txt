@@ -1,0 +1,10 @@
+# Um alvo por linha: <availability-domain>|<subnet_ocid>
+# Subnet no console: "subnet-20260406-1610" — o script precisa do OCID da subnet, não do nome.
+# Opcional: use scripts/oracle-cloud-fish.env.example (modo único AD com OCI_SUBNET_ID).
+# Descubra os nomes dos ADs com:
+#   oci iam availability-domain list --compartment-id <TENANCY_OCID> --query 'data[*].name' --raw-output
+# Cada subnet deve pertencer ao AD da linha (subnet em AD-1 não serve para lançar em AD-2).
+#
+# Exemplo (use os nomes exatos que o comando abaixo retornar; o prefixo antes da região varia):
+# PREFIXO:SA-SAOPAULO-1-AD-1|ocid1.subnet.oc1.sa-saopaulo-1.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+# PREFIXO:SA-SAOPAULO-1-AD-2|ocid1.subnet.oc1.sa-saopaulo-1.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb

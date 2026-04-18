@@ -48,20 +48,6 @@ const MovimentacaoDia = () => {
     const margemServicos = totalServicosHoje > 0 ? ((servicoLiquidoHoje / totalServicosHoje) * 100).toFixed(1) : '0';
     const markupServicos = totalGastoPecasHoje > 0 ? ((servicoLiquidoHoje / totalGastoPecasHoje) * 100).toFixed(1) : '0';
 
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-
-    // Estado de carregamento
-    if (isLoading) {
-        return (
-            <div className="d-flex justify-content-center align-items-center dashboard-loading-wrap">
-                <div className="text-center">
-                    <div className="spinner-border text-info mb-2" role="status"></div>
-                    <p className="text-info fw-bold">Sincronizando Shark Eletrônicos...</p>
-                </div>
-            </div>
-        );
-    }
-
     // Caso de erro na API
     if (isError) {
         return (
@@ -74,14 +60,16 @@ const MovimentacaoDia = () => {
 
     return (
         <div className="mt-2 text-white">
-            <div className="d-flex align-items-center justify-content-between mb-4">
+            <div className="mb-4">
                 <h2 className="mb-0 text-white fw-bold">
                     <i className="bi bi-speedometer2 text-white glow-success me-2"></i> MOVIMENTAÇÃO DO DIA
                 </h2>
-                <span className="badge bg-dark text-info border border-info px-3 py-2">
-                    {dataAtual}
-                </span>
             </div>
+            {isLoading && (
+                <div className="alert alert-info py-2 small">
+                    <i className="bi bi-arrow-repeat me-2"></i>Sincronizando Shark Eletrônicos...
+                </div>
+            )}
 
             <div className="row g-4 mb-4">
                 <div className="col-md-3">

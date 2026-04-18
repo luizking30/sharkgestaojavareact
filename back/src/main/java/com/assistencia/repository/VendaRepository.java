@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,13 +18,20 @@ public interface VendaRepository extends JpaRepository<Venda, Long> {
 
     List<Venda> findByEmpresaIdOrderByDataHoraDesc(Long empresaId);
 
+    @EntityGraph(attributePaths = {"vendedor", "itens", "itens.produto"})
     Page<Venda> findByEmpresaIdOrderByDataHoraDesc(Long empresaId, Pageable pageable);
 
-    @Query("SELECT v FROM Venda v WHERE v.empresa.id = :empresaId "
+    @EntityGraph(attributePaths = {"vendedor", "itens", "itens.produto"})
+    @Query(value = "SELECT DISTINCT v FROM Venda v WHERE v.empresa.id = :empresaId "
             + "AND (:id IS NULL OR v.id = :id) "
             + "AND (:vend IS NULL OR :vend = '' OR LOWER(COALESCE(v.nomeVendedorNoAto, '')) LIKE LOWER(CONCAT('%', :vend, '%'))) "
             + "AND (:d0 IS NULL OR v.dataHora >= :d0) "
-            + "AND (:d1 IS NULL OR v.dataHora < :d1)")
+            + "AND (:d1 IS NULL OR v.dataHora < :d1)",
+            countQuery = "SELECT COUNT(v) FROM Venda v WHERE v.empresa.id = :empresaId "
+                    + "AND (:id IS NULL OR v.id = :id) "
+                    + "AND (:vend IS NULL OR :vend = '' OR LOWER(COALESCE(v.nomeVendedorNoAto, '')) LIKE LOWER(CONCAT('%', :vend, '%'))) "
+                    + "AND (:d0 IS NULL OR v.dataHora >= :d0) "
+                    + "AND (:d1 IS NULL OR v.dataHora < :d1)")
     Page<Venda> findByEmpresaFiltrado(
             @Param("empresaId") Long empresaId,
             @Param("id") Long id,

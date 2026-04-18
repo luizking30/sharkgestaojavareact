@@ -123,7 +123,7 @@ public class ClienteController {
     /**
      * DELETAR CLIENTE (APENAS ADMIN)
      */
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")
     @DeleteMapping("/deletar/{id}") // Mudado para DeleteMapping para ser semântico
     public ResponseEntity<?> deletar(@PathVariable Long id) {
         try {

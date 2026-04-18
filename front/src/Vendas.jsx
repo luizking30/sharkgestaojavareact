@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import api from './api';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { debounce } from './utils/debounce';
 import { unwrapPage } from './utils/pageResponse';
 import SharkPagination from './components/SharkPagination';
 import { useFeedback } from './context/FeedbackContext';
+import { podeEstornoVenda } from './auth/accessRules';
 
 const HIST_PAGE_SIZE = 15;
 
@@ -25,7 +26,7 @@ const Vendas = ({ usuarioLogado }) => {
     const [filtros, setFiltros] = useState({ id: '', vendedor: '', data: '' });
     const [histPage, setHistPage] = useState(0);
 
-    const isAdmin = usuarioLogado?.role === 'ROLE_ADMIN';
+    const podeEstorno = podeEstornoVenda(usuarioLogado?.role);
     const inputBuscaRef = useRef(null);
 
     // --- 2. CÁLCULOS (MOVIDO PARA O TOPO PARA EVITAR ERRO DE INICIALIZAÇÃO) ---
@@ -37,7 +38,7 @@ const Vendas = ({ usuarioLogado }) => {
         setHistPage(0);
     }, [filtros.id, filtros.vendedor, filtros.data]);
 
-    const { data: histPageData, isLoading: histLoading } = useQuery({
+    const { data: histPageData, isLoading: histLoading, isFetching: histFetching } = useQuery({
         queryKey: ['historico-vendas', histPage, filtros.id, filtros.vendedor, filtros.data],
         queryFn: async () => {
             const params = {
@@ -57,6 +58,7 @@ const Vendas = ({ usuarioLogado }) => {
             const res = await api.get('/api/vendas', { params });
             return unwrapPage(res.data);
         },
+        placeholderData: keepPreviousData,
     });
 
     const vendasHistorico = histPageData?.items ?? [];
@@ -325,7 +327,7 @@ const Vendas = ({ usuarioLogado }) => {
                         </tr>
                         </thead>
                         <tbody>
-                        {histLoading ? (
+                        {histLoading && !histPageData ? (
                             <tr><td colSpan={5} className="text-center py-4 text-info">Carregando…</td></tr>
                         ) : (
                         vendasHistorico.map(v => (
@@ -345,7 +347,7 @@ const Vendas = ({ usuarioLogado }) => {
                                 <td className="text-success fw-bold">R$ {v.valorTotal.toFixed(2)}</td>
                                 <td className="text-center">
                                     <button className="btn btn-sm btn-outline-info border-0"><i className="bi bi-printer"></i></button>
-                                    {isAdmin && <button className="btn btn-sm btn-outline-danger border-0"><i className="bi bi-arrow-counterclockwise"></i></button>}
+                                    {podeEstorno && <button className="btn btn-sm btn-outline-danger border-0"><i className="bi bi-arrow-counterclockwise"></i></button>}
                                 </td>
                             </tr>
                         ))
@@ -361,7 +363,7 @@ const Vendas = ({ usuarioLogado }) => {
                 totalElements={histTotalElements}
                 pageSize={HIST_PAGE_SIZE}
                 onPageChange={setHistPage}
-                disabled={histLoading}
+                disabled={histFetching}
             />
         </div>
     );

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from './api';
 import { useQuery } from '@tanstack/react-query';
+import { formatRoleLabel, normalizeRole } from './auth/accessRules';
 
 const MeuPainel = ({ usuarioLogado }) => {
     const [abaAtiva, setAbaAtiva] = useState('vendas');
@@ -21,14 +22,9 @@ const MeuPainel = ({ usuarioLogado }) => {
     const formatarData = (data) =>
         data ? new Date(data).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
 
-    if (isLoading) return (
-        <div className="p-5 text-center text-info">
-            <div className="spinner-border mb-2"></div>
-            <p className="val-mono">Sincronizando Shark...</p>
-        </div>
-    );
-
     const user = extrato?.usuario || usuarioLogado;
+    const roleNorm = normalizeRole(user?.role);
+    const badgeDestaque = roleNorm === 'ROLE_OWNER' || roleNorm === 'ROLE_ADMIN';
     const listaVendas = extrato?.vendas || [];
     const listaServicos = extrato?.servicos || [];
     const listaPagamentos = extrato?.pagamentos || [];
@@ -38,19 +34,18 @@ const MeuPainel = ({ usuarioLogado }) => {
     return (
         <div className="mt-2 text-white">
             <div className="row mb-4">
-                <div className="col-12 d-flex justify-content-between align-items-center">
+                <div className="col-12">
                     <div>
                         <h2 className="fw-bold text-white mb-1"><i className="bi bi-person-badge me-2" style={{ color: '#0dcaf0' }}></i> Meu painel</h2>
                         <p className="text-white-50 small mb-0">Seus dados, comissões de vendas e O.S., pagamentos recebidos e histórico — tudo em um só lugar.</p>
                     </div>
-                    <div className="text-end">
-                        <span className="badge bg-dark border border-secondary p-2 val-mono">
-                            <i className="bi bi-calendar3 me-2 text-info"></i>
-                            {new Date().toLocaleDateString('pt-BR')}
-                        </span>
-                    </div>
                 </div>
             </div>
+            {isLoading && (
+                <div className="alert alert-info py-2 small">
+                    <i className="bi bi-arrow-repeat me-2"></i>Sincronizando Shark...
+                </div>
+            )}
 
             {/* INFO COLABORADOR SINCRONIZADA - WPP E CPF SEPARADOS */}
             <div className="row mb-4">
@@ -60,9 +55,9 @@ const MeuPainel = ({ usuarioLogado }) => {
                             <div className="col-md-3">
                                 <span className="label-stats text-info">Colaborador</span>
                                 <div className="text-white fw-bold">{user?.nome}</div>
-                                <span className={`badge bg-dark border mt-1 ${user?.tipoFuncionario === 'PROPRIETARIO' ? 'border-warning text-warning' : 'border-info text-info'}`} style={{ fontSize: '0.6rem' }}>
-                                    <i className={`bi ${user?.tipoFuncionario === 'PROPRIETARIO' ? 'bi-star-fill' : 'bi-tools'} me-1`}></i>
-                                    {user?.tipoFuncionario}
+                                <span className={`badge bg-dark border mt-1 ${badgeDestaque ? 'border-warning text-warning' : 'border-info text-info'}`} style={{ fontSize: '0.6rem' }}>
+                                    <i className={`bi ${badgeDestaque ? 'bi-star-fill' : 'bi-tools'} me-1`}></i>
+                                    {formatRoleLabel(user?.role)}
                                 </span>
                             </div>
                             <div className="col-md-2">

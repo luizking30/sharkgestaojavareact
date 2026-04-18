@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from './api';
 import { unwrapPage } from './utils/pageResponse';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import SharkPagination from './components/SharkPagination';
 import { useFeedback } from './context/FeedbackContext';
+import { forbidEdicaoExclusaoCliente } from './auth/accessRules';
 
 const PAGE_SIZE = 15;
 
@@ -16,7 +17,7 @@ const Clientes = ({ usuarioLogado }) => {
     const [buscaDebounced, setBuscaDebounced] = useState(busca);
     const [page, setPage] = useState(0);
 
-    const isAdmin = usuarioLogado?.role === 'ROLE_ADMIN';
+    const podeEditarExcluir = !forbidEdicaoExclusaoCliente(usuarioLogado?.role);
 
     useEffect(() => {
         const id = setTimeout(() => setBuscaDebounced(busca), 400);
@@ -27,7 +28,7 @@ const Clientes = ({ usuarioLogado }) => {
         setPage(0);
     }, [buscaDebounced.nome, buscaDebounced.cpf, buscaDebounced.whatsapp]);
 
-    const { data: pageData, isLoading } = useQuery({
+    const { data: pageData, isLoading, isFetching } = useQuery({
         queryKey: ['clientes', page, PAGE_SIZE, buscaDebounced],
         queryFn: async () => {
             const res = await api.get('/api/clientes', {
@@ -42,6 +43,7 @@ const Clientes = ({ usuarioLogado }) => {
             });
             return unwrapPage(res.data);
         },
+        placeholderData: keepPreviousData,
     });
 
     const clientes = pageData?.items ?? [];
@@ -118,7 +120,7 @@ const Clientes = ({ usuarioLogado }) => {
     };
 
     const handleDeletar = async (id) => {
-        if (!isAdmin) {
+        if (!podeEditarExcluir) {
             notify.warning('Ação restrita a administradores.', 'Permissão');
             return;
         }
@@ -134,7 +136,7 @@ const Clientes = ({ usuarioLogado }) => {
     };
 
     const handleEditar = (cliente) => {
-        if (!isAdmin) {
+        if (!podeEditarExcluir) {
             notify.warning('Ação restrita a administradores.', 'Permissão');
             return;
         }
@@ -232,7 +234,7 @@ const Clientes = ({ usuarioLogado }) => {
                         </tr>
                         </thead>
                         <tbody>
-                        {isLoading ? (
+                        {isLoading && !pageData ? (
                             <tr><td colSpan={5} className="text-center py-4 text-info">Carregando…</td></tr>
                         ) : (
                             clientes.map(c => (
@@ -249,11 +251,11 @@ const Clientes = ({ usuarioLogado }) => {
                                     <td className="text-center pe-4">
                                         <div className="d-flex justify-content-center gap-2">
                                             <button type="button" onClick={() => handleEditar(c)}
-                                                    className={`btn btn-sm btn-outline-info ${!isAdmin ? 'btn-readonly' : ''}`}>
+                                                    className={`btn btn-sm btn-outline-info ${!podeEditarExcluir ? 'btn-readonly' : ''}`}>
                                                 <i className="bi bi-pencil-square"></i>
                                             </button>
                                             <button type="button" onClick={() => handleDeletar(c.id)}
-                                                    className={`btn btn-sm btn-outline-danger ${!isAdmin ? 'btn-readonly' : ''}`}>
+                                                    className={`btn btn-sm btn-outline-danger ${!podeEditarExcluir ? 'btn-readonly' : ''}`}>
                                                 <i className="bi bi-trash3"></i>
                                             </button>
                                         </div>
@@ -272,7 +274,7 @@ const Clientes = ({ usuarioLogado }) => {
                 totalElements={totalElements}
                 pageSize={PAGE_SIZE}
                 onPageChange={setPage}
-                disabled={isLoading}
+                disabled={isFetching}
             />
         </div>
     );

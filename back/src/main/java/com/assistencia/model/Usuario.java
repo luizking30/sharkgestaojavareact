@@ -47,9 +47,6 @@ public class Usuario {
     @Column(name = "is_root", nullable = false)
     private boolean isRoot = false;
 
-    @Column(length = 20)
-    private String tipoFuncionario;
-
     @Column(nullable = false)
     private Double comissaoOs = 0.0;
 
@@ -104,7 +101,7 @@ public class Usuario {
 
     public Usuario() {}
 
-    public Usuario(String nome, String username, String email, String whatsapp, String cpf, String password, String role, boolean aprovado, String tipoFuncionario, Empresa empresa) {
+    public Usuario(String nome, String username, String email, String whatsapp, String cpf, String password, String role, boolean aprovado, Empresa empresa) {
         this.nome = nome;
         this.username = username;
         this.email = email;
@@ -113,7 +110,6 @@ public class Usuario {
         this.password = password;
         this.role = role;
         this.aprovado = aprovado;
-        this.tipoFuncionario = tipoFuncionario;
         this.empresa = empresa;
         this.isRoot = false; // Por padrão, construtor comum cria usuários não-root
     }
@@ -156,9 +152,6 @@ public class Usuario {
 
     public boolean isRoot() { return isRoot; }
     public void setRoot(boolean root) { isRoot = root; }
-
-    public String getTipoFuncionario() { return tipoFuncionario; }
-    public void setTipoFuncionario(String tipoFuncionario) { this.tipoFuncionario = tipoFuncionario; }
 
     public Double getComissaoOs() { return comissaoOs; }
     public void setComissaoOs(Double comissaoOs) { this.comissaoOs = comissaoOs; }

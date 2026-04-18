@@ -18,3 +18,7 @@ front/dist/
 # Variaveis de ambiente locais
 **/.env
 !**/.env.example
+
+# Oracle Cloud: credenciais locais da pesca de instância (não commitar)
+scripts/oracle-cloud-fish.env
+scripts/oracle-cloud-fish-targets.txt

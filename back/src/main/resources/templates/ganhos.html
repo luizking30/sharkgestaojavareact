@@ -112,11 +112,11 @@
                             <div class="col-md-3">
                                 <span class="label-stats text-info">Colaborador</span>
                                 <div class="text-white fw-bold" th:text="${usuario.nome}"></div>
-                                <span th:if="${usuario.tipoFuncionario == 'PROPRIETARIO'}" class="badge bg-dark border border-warning text-warning mt-1" style="font-size: 0.6rem; letter-spacing: 0.5px;">
-                                    <i class="bi bi-star-fill me-1"></i> PROPRIETÁRIO
+                                <span th:if="${usuario.role != null && usuario.role.contains('ADMIN')}" class="badge bg-dark border border-warning text-warning mt-1" style="font-size: 0.6rem; letter-spacing: 0.5px;">
+                                    <i class="bi bi-star-fill me-1"></i> ADMIN
                                 </span>
-                                <span th:if="${usuario.tipoFuncionario != 'PROPRIETARIO'}" class="badge bg-dark border border-info text-info mt-1" style="font-size: 0.6rem; letter-spacing: 0.5px;">
-                                    <i class="bi bi-tools me-1"></i> VENDEDOR TÉCNICO
+                                <span th:if="${usuario.role == null || !usuario.role.contains('ADMIN')}" class="badge bg-dark border border-info text-info mt-1" style="font-size: 0.6rem; letter-spacing: 0.5px;">
+                                    <i class="bi bi-tools me-1"></i> <span th:text="${usuario.role != null ? usuario.role.replace('ROLE_', '') : '—'}">ROLE</span>
                                 </span>
                             </div>
                             <div class="col-md-2">

@@ -238,11 +238,11 @@
           <span style="color: #94a3b8; font-weight: 500; font-size: 0.8rem;">Bem-vindo,</span>
           <span class="text-white fw-bold" style="text-shadow: 0 0 5px rgba(0, 212, 255, 0.4);" th:text="${usuarioLogado?.nome}">Usuário</span>
           <div class="mt-0">
-            <span th:if="${usuarioLogado?.tipoFuncionario == 'PROPRIETARIO'}" class="badge border border-warning text-warning" style="font-size: 0.55rem; padding: 2px 6px;">
-               <i class="bi bi-star-fill me-1"></i>PROPRIETÁRIO
+            <span th:if="${usuarioLogado?.role != null && usuarioLogado.role.contains('ADMIN')}" class="badge border border-warning text-warning" style="font-size: 0.55rem; padding: 2px 6px;">
+               <i class="bi bi-star-fill me-1"></i><span th:text="${usuarioLogado.role.replace('ROLE_', '')}">ADMIN</span>
             </span>
-            <span th:if="${usuarioLogado?.tipoFuncionario != 'PROPRIETARIO'}" class="badge border border-info text-info" style="font-size: 0.55rem; padding: 2px 6px;">
-               <i class="bi bi-tools me-1"></i>VENDEDOR TÉCNICO
+            <span th:if="${usuarioLogado?.role == null || !usuarioLogado.role.contains('ADMIN')}" class="badge border border-info text-info" style="font-size: 0.55rem; padding: 2px 6px;">
+               <i class="bi bi-tools me-1"></i><span th:text="${usuarioLogado?.role != null ? usuarioLogado.role.replace('ROLE_', '') : '—'}">ROLE</span>
             </span>
           </div>
         </div>

@@ -224,8 +224,8 @@
           <td class="ps-4 text-start">
             <div class="fw-bold text-white fs-6"><i class="bi bi-person-circle me-2 text-white-50"></i><span th:text="${u.nome}">Shark</span></div>
             <div th:if="${u.aprovado}">
-              <span th:if="${u.tipoFuncionario == 'PROPRIETARIO'}" class="badge-proprietario"><i class="bi bi-star-fill me-1"></i>PROPRIETÁRIO</span>
-              <span th:unless="${u.tipoFuncionario == 'PROPRIETARIO'}" class="text-info-50 val-mono" style="font-size: 0.65rem;" th:text="${u.tipoFuncionario}">Cargo</span>
+              <span th:if="${u.role != null && u.role.contains('ADMIN')}" class="badge-proprietario"><i class="bi bi-star-fill me-1"></i>ADMIN</span>
+              <span th:if="${u.role == null || !u.role.contains('ADMIN')}" class="text-info-50 val-mono" style="font-size: 0.65rem;" th:text="${u.role != null ? u.role.replace('ROLE_', '') : '—'}">Cargo</span>
             </div>
             <span th:if="${!u.aprovado}" class="badge bg-warning text-dark fw-bold" style="font-size: 0.6rem;">AGUARDANDO APROVAÇÃO</span>
           </td>
@@ -307,7 +307,7 @@
                       type="button"
                       data-bs-toggle="modal"
                       data-bs-target="#modalComissao"
-                      th:attr="data-id=${u.id}, data-nome=${u.nome}, data-tipo=${u.tipoFuncionario}, data-com-os=${u.comissaoOs}, data-com-venda=${u.comissaoVenda}, data-liq-os=${liqOs}, data-liq-venda=${liqVenda}"
+                      th:attr="data-id=${u.id}, data-nome=${u.nome}, data-role=${u.role}, data-com-os=${u.comissaoOs}, data-com-venda=${u.comissaoVenda}, data-liq-os=${liqOs}, data-liq-venda=${liqVenda}"
                       onclick="popularDados(this)">
                 <i class="bi bi-gear-fill"></i>
               </button>
@@ -441,9 +441,9 @@
           <div class="mb-3">
             <label class="header-info-mini mb-2">Função do Colaborador</label>
             <select id="tipoFuncModal" class="form-select bg-black text-white border-secondary shadow-none">
-              <option value="VENDEDOR">VENDEDOR</option>
-              <option value="TECNICO">TÉCNICO</option>
-              <option value="PROPRIETARIO">PROPRIETÁRIO</option>
+              <option value="ROLE_VENDEDOR">VENDEDOR</option>
+              <option value="ROLE_TECNICO">TÉCNICO</option>
+              <option value="ROLE_ADMIN">ADMIN DA UNIDADE</option>
             </select>
           </div>
           <div class="row g-2 mb-4">
@@ -535,7 +535,7 @@
       const aviso = document.getElementById('avisoTrava');
 
       document.getElementById('idFuncModal').value = btn.getAttribute('data-id');
-      document.getElementById('tipoFuncModal').value = btn.getAttribute('data-tipo') || 'VENDEDOR';
+      document.getElementById('tipoFuncModal').value = btn.getAttribute('data-role') || 'ROLE_VENDEDOR';
       inputOs.value = btn.getAttribute('data-com-os') || 0;
       inputVenda.value = btn.getAttribute('data-com-venda') || 0;
 
@@ -555,18 +555,17 @@
     function salvarConfig(e) {
       e.preventDefault();
       const id = document.getElementById('idFuncModal').value;
-      const payload = new URLSearchParams();
-      payload.append('tipoFuncionario', document.getElementById('tipoFuncModal').value);
-      payload.append('comissaoOs', document.getElementById('osFuncModal').value);
-      payload.append('comissaoVenda', document.getElementById('vendaFuncModal').value);
-
       const token = document.querySelector('meta[name="_csrf"]')?.content;
       const header = document.querySelector('meta[name="_csrf_header"]')?.content;
-
-      fetch(`/admin/funcionarios/configurar/${id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', [header]: token },
-        body: payload.toString()
+      const body = JSON.stringify({
+        role: document.getElementById('tipoFuncModal').value,
+        comissaoOs: document.getElementById('osFuncModal').value,
+        comissaoVenda: document.getElementById('vendaFuncModal').value
+      });
+      fetch(`/api/admin/funcionarios/configurar/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(header && token ? { [header]: token } : {}) },
+        body
       }).then(res => { if(res.ok) window.location.reload(); });
     }
 

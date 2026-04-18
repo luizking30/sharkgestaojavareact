@@ -1,5 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { isRouteForbidden } from './auth/accessRules';
+import api from './api';
 // IMPORTAÇÃO DO REACT QUERY
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FeedbackProvider } from './context/FeedbackContext';
@@ -36,13 +38,30 @@ function RouteFallback() {
   );
 }
 
-// 1. CRIAR O CLIENTE FORA DO COMPONENTE
+/**
+ * Rota raiz: após cadastro público o React Router envia `state.successMsg`.
+ * Se o usuário já estiver logado, a "/" antiga redirecionava para o dashboard e a mensagem sumia.
+ */
+function RootRoute({ usuarioLogado, isLoggingOut }) {
+  const location = useLocation();
+  const temMsgPosCadastro = Boolean(location.state?.successMsg);
+  if (!usuarioLogado || isLoggingOut || temMsgPosCadastro) {
+    return <Login />;
+  }
+  return <Navigate to="/dashboard" replace />;
+}
+
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            staleTime: 30_000,
-            gcTime: 5 * 60_000,
+            staleTime: 2 * 60_000,
+            gcTime: 15 * 60_000,
             refetchOnWindowFocus: false,
+            refetchOnReconnect: true,
+            refetchOnMount: false,
+            retry: 1,
+        },
+        mutations: {
             retry: 1,
         },
     },
@@ -63,6 +82,7 @@ function App() {
     }
     return null;
   });
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   /**
    * MONITORAMENTO DE LOGIN
@@ -71,24 +91,89 @@ function App() {
     const checkAuth = () => {
       const salvo = localStorage.getItem('usuarioShark');
       setUsuarioLogado(salvo ? JSON.parse(salvo) : null);
+      setIsLoggingOut(false);
     };
     window.addEventListener('storage', checkAuth);
     return () => window.removeEventListener('storage', checkAuth);
   }, []);
 
+  useEffect(() => {
+    const handleAuthLogin = (event) => {
+      if (event?.detail) {
+        setUsuarioLogado(event.detail);
+        setIsLoggingOut(false);
+        return;
+      }
+      const salvo = localStorage.getItem('usuarioShark');
+      setUsuarioLogado(salvo ? JSON.parse(salvo) : null);
+      setIsLoggingOut(false);
+    };
+
+    const handleAuthLogout = () => {
+      setIsLoggingOut(true);
+      setUsuarioLogado(null);
+    };
+
+    window.addEventListener('auth:login', handleAuthLogin);
+    window.addEventListener('auth:logout', handleAuthLogout);
+
+    return () => {
+      window.removeEventListener('auth:login', handleAuthLogin);
+      window.removeEventListener('auth:logout', handleAuthLogout);
+    };
+  }, []);
+
+  /** Alinha role com o banco após mudanças no painel empresa. */
+  useEffect(() => {
+    const raw = localStorage.getItem('usuarioShark');
+    if (!raw || raw === 'undefined' || raw === 'null') return undefined;
+    let cancelled = false;
+    api
+      .get('/api/auth/me')
+      .then((res) => {
+        if (cancelled) return;
+        try {
+          const prev = JSON.parse(raw);
+          const merged = { ...prev, ...res.data };
+          localStorage.setItem('usuarioShark', JSON.stringify(merged));
+          setUsuarioLogado(merged);
+        } catch (e) {
+          console.error('Sessão: merge inválido', e);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   /**
    * HELPER DE ROTA PROTEGIDA
    */
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    localStorage.removeItem('usuarioShark');
+    queryClient.clear();
+    setUsuarioLogado(null);
+    window.dispatchEvent(new Event('auth:logout'));
+  };
+
   const PrivateRoute = ({ children }) => {
-    return usuarioLogado ? (
-        <Layout usuarioLogado={usuarioLogado}>{children}</Layout>
-    ) : (
-        <Navigate to="/" replace />
+    const location = useLocation();
+    if (!usuarioLogado) {
+      return <Navigate to="/" replace />;
+    }
+    if (isRouteForbidden(location.pathname, usuarioLogado)) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return (
+      <Layout usuarioLogado={usuarioLogado} onLogout={handleLogout}>
+        {children}
+      </Layout>
     );
   };
 
   return (
-      // 2. ENVOLVER COM O PROVIDER
       <QueryClientProvider client={queryClient}>
         <FeedbackProvider>
         <Router>
@@ -97,7 +182,7 @@ function App() {
             {/* ROTAS PÚBLICAS */}
             <Route
                 path="/"
-                element={!usuarioLogado ? <Login /> : <Navigate to="/dashboard" replace />}
+                element={<RootRoute usuarioLogado={usuarioLogado} isLoggingOut={isLoggingOut} />}
             />
             <Route path="/resetar-senha" element={<NovaSenha />} />
             <Route path="/registro-empresa" element={<RegistroEmpresa />} />
@@ -115,23 +200,11 @@ function App() {
             <Route path="/meu-painel" element={<PrivateRoute><MeuPainel usuarioLogado={usuarioLogado} /></PrivateRoute>} />
             <Route path="/ganhos" element={<Navigate to="/meu-painel" replace />} />
 
-            {/* 🛡️ ROTA ADM DA EMPRESA (Donos de Loja) */}
-            <Route path="/admin/empresa" element={
-              usuarioLogado?.role === 'ROLE_ADMIN' || usuarioLogado?.role === 'ROLE_OWNER' ? (
-                  <PrivateRoute><AdminEmpresa usuarioLogado={usuarioLogado} /></PrivateRoute>
-              ) : (
-                  <Navigate to="/dashboard" replace />
-              )
-            } />
+            {/* 🛡️ ADM da empresa: bloqueado para funcionário via accessRules */}
+            <Route path="/admin/empresa" element={<PrivateRoute><AdminEmpresa usuarioLogado={usuarioLogado} /></PrivateRoute>} />
 
-            {/* 👑 ROTA ADM GERAL (Apenas para você, Luiz - SaaS Owner) */}
-            <Route path="/super-admin" element={
-              usuarioLogado?.role === 'ROLE_OWNER' ? (
-                  <PrivateRoute><SuperAdmin /></PrivateRoute>
-              ) : (
-                  <Navigate to="/dashboard" replace />
-              )
-            } />
+            {/* 👑 PAINEL GERAL SaaS: apenas ROLE_OWNER (accessRules) */}
+            <Route path="/super-admin" element={<PrivateRoute><SuperAdmin /></PrivateRoute>} />
 
             {/* ROTAS DE PAGAMENTO */}
             <Route path="/pagamento" element={<PrivateRoute><Pagamento /></PrivateRoute>} />

@@ -105,8 +105,19 @@ function RegistroEmpresa() {
                 password: formData.password
             });
 
+            try {
+                localStorage.removeItem('usuarioShark');
+            } catch {
+                /* ignore */
+            }
+            window.dispatchEvent(new Event('auth:logout'));
+
             navigate('/', {
-                state: { successMsg: "Empresa e Proprietário cadastrados com Sucesso!" }
+                replace: true,
+                state: {
+                    successMsg:
+                        'Cadastro concluído! Sua empresa e o acesso do proprietário foram criados. Faça login com o usuário e a senha informados.'
+                }
             });
 
         } catch (error) {
