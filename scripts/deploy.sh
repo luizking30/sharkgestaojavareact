@@ -10,9 +10,9 @@ cd "${PROJECT_ROOT}"
 
 echo "==> 🦈 Shark Deploy | Iniciando atualização da API..."
 
-# 1. ATUALIZAR CÓDIGO (BACK-END)
+# 1. GIT
 echo "==> Buscando atualizações no GitHub..."
-git pull origin main
+git pull origin master
 
 # 2. LIMPEZA DE RAM (ESSENCIAL PARA 1GB)
 echo "==> Liberando memória para o novo build..."
