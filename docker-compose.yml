@@ -86,6 +86,7 @@ services:
       /bin/bash -c "sed -i 's/path:\\[\"id\"\\]/path:\"$$.id\"/g; s/path:\\[\"fromMe\"\\]/path:\"$$.fromMe\"/g; s/path:\\[\"remoteJid\"\\]/path:\"$$.remoteJid\"/g; s/path:\\[\"participants\"\\]/path:\"$$.participants\"/g' /evolution/dist/main.js &&
       . ./Docker/scripts/deploy_database.sh &&
       npm run start:prod"
+    # Só loopback 8090 — nunca mapeie o container evolution para 8080 no host (senão rouba a porta do Java).
     ports:
       - "127.0.0.1:8090:8080"
     extra_hosts:
