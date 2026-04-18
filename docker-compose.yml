@@ -1,23 +1,5 @@
 services:
-  # Front na Vercel — não há mais Nginx na VPS servindo dist. Opcional para dev local:
-  # docker compose --profile front-container up -d front
-  front:
-    profiles:
-      - front-container
-    build:
-      context: ./front
-      dockerfile: Dockerfile
-    container_name: shark-front
-    ports:
-      - "5173:80"
-    depends_on:
-      - api
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-
+  # Front: use `npm run dev` na pasta front (Vercel em produção). Sem imagem Docker do front.
   api:
     build:
       context: ./back
