@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from './api';
 import { useQueryClient, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { debounce } from './utils/debounce';
@@ -14,6 +15,7 @@ import {
 const OS_PAGE_SIZE = 15;
 
 const OrdensServico = ({ usuarioLogado }) => {
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { notify, confirmDialog, promptDialog } = useFeedback();
     const [page, setPage] = useState(0);
@@ -161,24 +163,6 @@ const OrdensServico = ({ usuarioLogado }) => {
 
         } catch (err) {
             notify.error(String(err.response?.data || 'Erro ao atualizar status.'), 'O.S.');
-        }
-    };
-
-    // --- IMPRESSÃO DE PDF ---
-    const imprimirPDF = async (id) => {
-        try {
-            const response = await api.get(`/api/ordens/pdf/${id}`, {
-                responseType: 'blob',
-            });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `OS_${id}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } catch (err) {
-            notify.error('Erro ao gerar PDF.', 'O.S.');
         }
     };
 
@@ -378,8 +362,13 @@ const OrdensServico = ({ usuarioLogado }) => {
                                 </td>
                                 <td className="text-center" data-label="Ações">
                                     <div className="btn-group flex-wrap">
-                                        <button className="btn btn-sm btn-outline-info" onClick={() => imprimirPDF(o.id)}>
-                                            <i className="bi bi-file-earmark-pdf"></i>
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm btn-outline-info"
+                                            title="Comprovante / imprimir"
+                                            onClick={() => navigate(`/imprimir-os/${o.id}`)}
+                                        >
+                                            <i className="bi bi-printer"></i>
                                         </button>
                                         {podeExcluirOs && (
                                             <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeletar(o.id)}>

@@ -26,6 +26,8 @@ const NovaSenha = lazy(() => import('./NovaSenha'));
 const RegistroEmpresa = lazy(() => import('./RegistroEmpresa'));
 const RegistroFuncionario = lazy(() => import('./RegistroFuncionario'));
 const SuperAdmin = lazy(() => import('./SuperAdmin'));
+const ImprimirOrdemServico = lazy(() => import('./ImprimirOrdemServico'));
+const ImprimirVenda = lazy(() => import('./ImprimirVenda'));
 
 function RouteFallback() {
   return (
@@ -173,6 +175,14 @@ function App() {
     );
   };
 
+  /** Autenticado, sem shell (comprovante HTML / impressão). */
+  const PrivatePrintRoute = ({ children }) => {
+    if (!usuarioLogado) {
+      return <Navigate to="/" replace />;
+    }
+    return <>{children}</>;
+  };
+
   return (
       <QueryClientProvider client={queryClient}>
         <FeedbackProvider>
@@ -209,6 +219,23 @@ function App() {
             {/* ROTAS DE PAGAMENTO */}
             <Route path="/pagamento" element={<PrivateRoute><Pagamento /></PrivateRoute>} />
             <Route path="/pagamento-pix" element={<PrivateRoute><PagamentoPix /></PrivateRoute>} />
+
+            <Route
+              path="/imprimir-os/:id"
+              element={
+                <PrivatePrintRoute>
+                  <ImprimirOrdemServico />
+                </PrivatePrintRoute>
+              }
+            />
+            <Route
+              path="/imprimir-venda/:id"
+              element={
+                <PrivatePrintRoute>
+                  <ImprimirVenda />
+                </PrivatePrintRoute>
+              }
+            />
 
             {/* ROTA "CORINGA" */}
             <Route path="*" element={<Navigate to="/" replace />} />

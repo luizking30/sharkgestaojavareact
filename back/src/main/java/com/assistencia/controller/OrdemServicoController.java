@@ -3,6 +3,7 @@ package com.assistencia.controller;
 import com.assistencia.model.Cliente;
 import com.assistencia.model.OrdemServico;
 import com.assistencia.model.Usuario;
+import com.assistencia.dto.OrdemServicoResponseDTO;
 import com.assistencia.dto.mapper.OrdemServicoMapper;
 import com.assistencia.repository.ClienteRepository;
 import com.assistencia.repository.OrdemServicoRepository;
@@ -280,6 +281,23 @@ public class OrdemServicoController {
                     ordemRepo.delete(os);
                     return ResponseEntity.ok().build();
                 }).orElse(ResponseEntity.status(403).build());
+    }
+
+    /**
+     * Detalhe de uma O.S. (mesma empresa) — comprovante HTML no front.
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")
+    @GetMapping("/{id}")
+    public ResponseEntity<OrdemServicoResponseDTO> obterPorId(@PathVariable Long id) {
+        Usuario logado = securityUtils.getUsuarioLogado();
+        if (logado == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Long empresaId = logado.getEmpresa().getId();
+        return ordemRepo.findById(id)
+                .filter(os -> os.getEmpresa().getId().equals(empresaId))
+                .map(os -> ResponseEntity.ok(OrdemServicoMapper.toResponse(os)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','OWNER','TECNICO','VENDEDOR')")

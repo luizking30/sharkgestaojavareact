@@ -159,6 +159,22 @@ public class VendasController {
         }
     }
 
+    /**
+     * Detalhe de uma venda (mesma empresa) — cupom HTML no front.
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<VendaResponseDTO> obterPorId(@PathVariable Long id) {
+        Usuario logado = securityUtils.getUsuarioLogado();
+        if (logado == null) {
+            return ResponseEntity.status(401).build();
+        }
+        Long empresaId = logado.getEmpresa().getId();
+        return vendaRepo.findById(id)
+                .filter(v -> v.getEmpresa().getId().equals(empresaId))
+                .map(v -> ResponseEntity.ok(VendaMapper.toResponse(v)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/pdf/{id}")
     public ResponseEntity<byte[]> gerarPdfVenda(@PathVariable Long id) {
         try {

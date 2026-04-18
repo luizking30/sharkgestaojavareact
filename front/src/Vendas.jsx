@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from './api';
 import { useQueryClient, useQuery, keepPreviousData } from '@tanstack/react-query';
 import { debounce } from './utils/debounce';
@@ -10,6 +11,7 @@ import { podeEstornoVenda } from './auth/accessRules';
 const HIST_PAGE_SIZE = 15;
 
 const Vendas = ({ usuarioLogado }) => {
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { notify } = useFeedback();
 
@@ -346,7 +348,14 @@ const Vendas = ({ usuarioLogado }) => {
                                 </td>
                                 <td className="text-success fw-bold" data-label="Total">R$ {v.valorTotal.toFixed(2)}</td>
                                 <td className="text-center" data-label="Ações">
-                                    <button className="btn btn-sm btn-outline-info border-0"><i className="bi bi-printer"></i></button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-info border-0"
+                                        title="Cupom / imprimir"
+                                        onClick={() => navigate(`/imprimir-venda/${v.id}`)}
+                                    >
+                                        <i className="bi bi-printer"></i>
+                                    </button>
                                     {podeEstorno && <button className="btn btn-sm btn-outline-danger border-0"><i className="bi bi-arrow-counterclockwise"></i></button>}
                                 </td>
                             </tr>

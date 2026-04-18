@@ -1,0 +1,135 @@
+/* Comprovantes HTML (imprimir O.S. / venda) — tela + impressão */
+
+.print-receipt-root {
+  min-height: 100vh;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding-bottom: 2rem;
+}
+
+.print-receipt-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  backdrop-filter: blur(8px);
+}
+
+.print-receipt-toolbar .btn {
+  min-height: 48px;
+}
+
+.print-receipt-sheet {
+  max-width: 420px;
+  margin: 1rem auto;
+  padding: 1.25rem;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.print-receipt-sheet h1 {
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  margin: 0 0 0.35rem;
+}
+
+.print-receipt-sheet .print-sub {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #475569;
+  margin-bottom: 0.75rem;
+}
+
+.print-receipt-banner {
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.35rem 0;
+  border-top: 1px dashed #94a3b8;
+  border-bottom: 1px dashed #94a3b8;
+  margin: 0.5rem 0;
+}
+
+.print-receipt-section-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  text-align: center;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.print-receipt-divider {
+  border: 0;
+  border-top: 1px dashed #cbd5e1;
+  margin: 0.5rem 0;
+}
+
+.print-receipt-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.print-receipt-kv dt {
+  font-weight: 600;
+  color: #475569;
+  margin: 0;
+}
+
+.print-receipt-kv dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.print-receipt-total {
+  text-align: right;
+  font-weight: 800;
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+}
+
+.print-receipt-muted {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+  margin-top: 0.75rem;
+}
+
+@media print {
+  .print-receipt-root {
+    background: #fff;
+    padding: 0;
+  }
+
+  .print-receipt-toolbar {
+    display: none !important;
+  }
+
+  .print-receipt-sheet {
+    margin: 0 auto;
+    max-width: 80mm;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0.5rem;
+  }
+
+  @page {
+    margin: 8mm;
+  }
+}

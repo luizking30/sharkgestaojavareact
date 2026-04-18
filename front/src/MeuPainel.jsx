@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from './api';
 import { useQuery } from '@tanstack/react-query';
 import { formatRoleLabel, normalizeRole } from './auth/accessRules';
 
 const MeuPainel = ({ usuarioLogado }) => {
+    const navigate = useNavigate();
     const [abaAtiva, setAbaAtiva] = useState('vendas');
 
     // 🦈 SHARK SYNC: Busca dados em tempo real ignorando o cache antigo do localStorage
@@ -30,21 +32,6 @@ const MeuPainel = ({ usuarioLogado }) => {
     const listaPagamentos = extrato?.pagamentos || [];
 
     const totalGeral = (user?.saldoVendaCalculado || 0) + (user?.totalComissaoOsAcumulada || 0);
-
-    const imprimirOS = async (id) => {
-        try {
-            const response = await api.get(`/api/ordens/pdf/${id}`, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `OS_${id}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } catch (e) {
-            console.error('Erro ao gerar PDF da OS', e);
-        }
-    };
 
     return (
         <div className="mt-2 text-white">
@@ -198,8 +185,14 @@ const MeuPainel = ({ usuarioLogado }) => {
                                         <td data-label="Produto / serviço">{os.produto}</td>
                                         <td className="pe-4 text-end fw-bold text-success val-mono" data-label="Sua comissão">{formatarMoeda(comissao)}</td>
                                         <td className="pe-4 text-end" data-label="Ações">
-                                            <button className="btn btn-sm btn-outline-info" onClick={() => imprimirOS(os.id)}>
-                                                PDF
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm btn-outline-info"
+                                                title="Comprovante / imprimir"
+                                                onClick={() => navigate(`/imprimir-os/${os.id}`)}
+                                            >
+                                                <i className="bi bi-printer me-1"></i>
+                                                Cupom
                                             </button>
                                         </td>
                                     </tr>
