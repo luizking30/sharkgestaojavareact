@@ -1,5 +1,5 @@
 services:
-  # Front: use `npm run dev` na pasta front (Vercel em produção). Sem imagem Docker do front.
+  # Front: desenvolvimento com `npm run dev` na pasta front; produção na Vercel.
   api:
     build:
       context: ./back
