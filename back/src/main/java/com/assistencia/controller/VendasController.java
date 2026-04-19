@@ -4,6 +4,7 @@ import com.assistencia.dto.VendaResponseDTO;
 import com.assistencia.dto.VendaSalvarRequestDTO;
 import com.assistencia.dto.mapper.VendaMapper;
 import com.assistencia.model.*;
+import com.assistencia.repository.ClienteRepository;
 import com.assistencia.repository.ProdutoRepository;
 import com.assistencia.repository.VendaRepository;
 import com.assistencia.util.SecurityUtils;
@@ -36,13 +37,15 @@ public class VendasController {
 
     private final VendaRepository vendaRepo;
     private final ProdutoRepository produtoRepo;
+    private final ClienteRepository clienteRepo;
 
     @Autowired
     private SecurityUtils securityUtils;
 
-    public VendasController(VendaRepository vendaRepo, ProdutoRepository produtoRepo) {
+    public VendasController(VendaRepository vendaRepo, ProdutoRepository produtoRepo, ClienteRepository clienteRepo) {
         this.vendaRepo = vendaRepo;
         this.produtoRepo = produtoRepo;
+        this.clienteRepo = clienteRepo;
     }
 
     @GetMapping
@@ -127,6 +130,21 @@ public class VendasController {
             venda.setVendedor(vendedorObj);
             venda.setDataHora(LocalDateTime.now());
             venda.setPago(true);
+
+            boolean temDesconto = dto.getItens().stream()
+                    .anyMatch(row -> row.getDesconto() != null && row.getDesconto() > 0);
+            if (temDesconto) {
+                if (dto.getClienteId() == null) {
+                    return ResponseEntity.badRequest().body("Desconto só pode ser aplicado com cliente cadastrado. Selecione o cliente.");
+                }
+                Cliente cli = clienteRepo.findById(dto.getClienteId()).orElse(null);
+                if (cli == null || !cli.getEmpresa().getId().equals(vendedorObj.getEmpresa().getId())) {
+                    return ResponseEntity.badRequest().body("Cliente inválido ou não pertence à sua empresa.");
+                }
+                venda.setCliente(cli);
+            } else {
+                venda.setCliente(null);
+            }
 
             for (VendaSalvarRequestDTO.ItemSalvarDTO row : dto.getItens()) {
                 if (row.getProduto() == null || row.getProduto().getId() == null) {

@@ -8,8 +8,12 @@ import java.util.List;
 public class VendaSalvarRequestDTO {
     /** Enviado pelo PDV; o total efetivo é recalculado em {@code Venda#validarDadosAntesDeSalvar}. */
     private Double valorTotal;
+    /** Obrigatório quando algum item tiver desconto maior que zero. */
+    private Long clienteId;
     private List<ItemSalvarDTO> itens;
 
+    public Long getClienteId() { return clienteId; }
+    public void setClienteId(Long clienteId) { this.clienteId = clienteId; }
     public Double getValorTotal() { return valorTotal; }
     public void setValorTotal(Double valorTotal) { this.valorTotal = valorTotal; }
     public List<ItemSalvarDTO> getItens() { return itens; }

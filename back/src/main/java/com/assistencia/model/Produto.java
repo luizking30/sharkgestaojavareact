@@ -35,6 +35,10 @@ public class Produto {
     private Double precoVenda;
     private Integer quantidade;
 
+    /** URL da imagem do produto (ex.: CDN ou link público). */
+    @Column(name = "imagem_url", length = 500)
+    private String imagemUrl;
+
     // Método auxiliar para facilitar a criação rápida se necessário
     public Produto(String nome, Double precoCusto, Double precoVenda, Integer quantidade, Empresa empresa) {
         this.nome = nome;

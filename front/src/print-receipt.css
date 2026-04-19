@@ -111,6 +111,52 @@
   margin-top: 0.75rem;
 }
 
+/* Linha do tempo O.S. */
+.print-receipt-timeline {
+  padding-left: 0;
+}
+
+.print-receipt-timeline-item {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.45rem 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.print-receipt-timeline-item:last-child {
+  border-bottom: none;
+}
+
+.print-receipt-timeline-label {
+  flex: 0 0 5.2rem;
+  font-weight: 800;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.print-receipt-timeline-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.print-receipt-timeline-who {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.8rem;
+  word-break: break-word;
+  line-height: 1.25;
+}
+
+.print-receipt-timeline-when {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
 @media print {
   .print-receipt-root {
     background: #fff;

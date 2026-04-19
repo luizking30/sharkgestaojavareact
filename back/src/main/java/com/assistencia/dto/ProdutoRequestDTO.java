@@ -14,6 +14,7 @@ public class ProdutoRequestDTO {
     private Double precoCusto;
     private Double precoVenda;
     private Integer quantidade;
+    private String imagemUrl;
 
     public Object getId() { return id; }
     public void setId(Object id) { this.id = id; }
@@ -27,4 +28,6 @@ public class ProdutoRequestDTO {
     public void setPrecoVenda(Double precoVenda) { this.precoVenda = precoVenda; }
     public Integer getQuantidade() { return quantidade; }
     public void setQuantidade(Integer quantidade) { this.quantidade = quantidade; }
+    public String getImagemUrl() { return imagemUrl; }
+    public void setImagemUrl(String imagemUrl) { this.imagemUrl = imagemUrl; }
 }

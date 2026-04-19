@@ -10,6 +10,7 @@ public class ProdutoResponseDTO {
     private Double precoCusto;
     private Double precoVenda;
     private Integer quantidade;
+    private String imagemUrl;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -23,4 +24,6 @@ public class ProdutoResponseDTO {
     public void setPrecoVenda(Double precoVenda) { this.precoVenda = precoVenda; }
     public Integer getQuantidade() { return quantidade; }
     public void setQuantidade(Integer quantidade) { this.quantidade = quantidade; }
+    public String getImagemUrl() { return imagemUrl; }
+    public void setImagemUrl(String imagemUrl) { this.imagemUrl = imagemUrl; }
 }

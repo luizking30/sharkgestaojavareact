@@ -86,7 +86,16 @@ public class EstoqueController {
         Usuario logado = securityUtils.getUsuarioLogado();
         if (logado == null) return ResponseEntity.status(401).build();
 
-        List<Produto> sugestoes = repo.findByNomeContainingIgnoreCaseAndEmpresaId(termo, logado.getEmpresa().getId());
+        Long empresaId = logado.getEmpresa().getId();
+        String t = termo != null ? termo.trim() : "";
+        if (!t.isEmpty() && t.matches("\\d{3,20}")) {
+            Optional<Produto> porCodigo = repo.findByCodigoBarrasAndEmpresaId(t, empresaId);
+            if (porCodigo.isPresent()) {
+                return ResponseEntity.ok(List.of(ProdutoMapper.toResponse(porCodigo.get())));
+            }
+        }
+
+        List<Produto> sugestoes = repo.findByNomeContainingIgnoreCaseAndEmpresaId(t, empresaId);
         return ResponseEntity.ok(sugestoes.stream().map(ProdutoMapper::toResponse).collect(Collectors.toList()));
     }
 

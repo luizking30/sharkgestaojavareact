@@ -90,8 +90,19 @@ const ImprimirOrdemServico = () => {
   const { data: os, isLoading, isError, error } = useQuery({
     queryKey: ['imprimir-os', osId],
     queryFn: async () => {
-      const res = await api.get(`/api/ordens/${osId}`);
-      return res.data;
+      try {
+        const res = await api.get(`/api/ordens/${osId}`);
+        return res.data;
+      } catch (e) {
+        if (e.response?.status === 404) {
+          const res2 = await api.get('/api/ordens', {
+            params: { id: osId, page: 0, size: 1, sort: 'id,desc' },
+          });
+          const content = res2.data?.content ?? [];
+          if (content.length > 0) return content[0];
+        }
+        throw e;
+      }
     },
     enabled: idValido,
   });
@@ -222,26 +233,42 @@ const ImprimirOrdemServico = () => {
 
         <div className="print-receipt-section-title">LINHA DO TEMPO</div>
         <hr className="print-receipt-divider" />
-        <div className="small">
-          <div>
-            <strong>Abertura:</strong> {fmtData(os.data)} | {os.funcionarioAbertura || '—'}
-          </div>
-          {os.dataAndamento && (
-            <div className="mt-1">
-              <strong>Em andamento:</strong> {fmtData(os.dataAndamento)} | {os.funcionarioAndamento || '—'}
+        <ul className="print-receipt-timeline list-unstyled mb-0">
+          <li className="print-receipt-timeline-item">
+            <div className="print-receipt-timeline-label">Aberto</div>
+            <div className="print-receipt-timeline-body">
+              <div className="print-receipt-timeline-who">{os.funcionarioAbertura || '—'}</div>
+              <div className="print-receipt-timeline-when">{fmtData(os.data)}</div>
             </div>
+          </li>
+          {os.dataAndamento && (
+            <li className="print-receipt-timeline-item">
+              <div className="print-receipt-timeline-label">Andamento</div>
+              <div className="print-receipt-timeline-body">
+                <div className="print-receipt-timeline-who">{os.funcionarioAndamento || '—'}</div>
+                <div className="print-receipt-timeline-when">{fmtData(os.dataAndamento)}</div>
+              </div>
+            </li>
           )}
           {os.dataPronto && (
-            <div className="mt-1">
-              <strong>Pronto:</strong> {fmtData(os.dataPronto)} | {os.funcionarioPronto || '—'}
-            </div>
+            <li className="print-receipt-timeline-item">
+              <div className="print-receipt-timeline-label">Pronto</div>
+              <div className="print-receipt-timeline-body">
+                <div className="print-receipt-timeline-who">{os.funcionarioPronto || '—'}</div>
+                <div className="print-receipt-timeline-when">{fmtData(os.dataPronto)}</div>
+              </div>
+            </li>
           )}
           {os.dataEntrega && (
-            <div className="mt-1">
-              <strong>Entregue:</strong> {fmtData(os.dataEntrega)} | {os.funcionarioEntrega || '—'}
-            </div>
+            <li className="print-receipt-timeline-item">
+              <div className="print-receipt-timeline-label">Entregue</div>
+              <div className="print-receipt-timeline-body">
+                <div className="print-receipt-timeline-who">{os.funcionarioEntrega || '—'}</div>
+                <div className="print-receipt-timeline-when">{fmtData(os.dataEntrega)}</div>
+              </div>
+            </li>
           )}
-        </div>
+        </ul>
 
         <div className="print-receipt-section-title">STATUS ATUAL (COMPROVANTE)</div>
         <hr className="print-receipt-divider" />

@@ -27,6 +27,11 @@ const Vendas = ({ usuarioLogado }) => {
     const [quantidade, setQuantidade] = useState(1);
     const [filtros, setFiltros] = useState({ id: '', vendedor: '', data: '' });
     const [histPage, setHistPage] = useState(0);
+    /** Cliente obrigatório quando houver desconto no carrinho ou ao incluir item com desconto. */
+    const [clienteVenda, setClienteVenda] = useState(null);
+    const [modalClienteAberto, setModalClienteAberto] = useState(false);
+    const [termoCliente, setTermoCliente] = useState('');
+    const [sugestoesCliente, setSugestoesCliente] = useState([]);
 
     const podeEstorno = podeEstornoVenda(usuarioLogado?.role);
     const inputBuscaRef = useRef(null);
@@ -98,8 +103,19 @@ const Vendas = ({ usuarioLogado }) => {
             return;
         }
 
+        const precisaCliente = itensCarrinho.some((it) => Number(it.desconto) > 0);
+        if (precisaCliente && !clienteVenda?.id) {
+            notify.warning(
+                'Descontos só podem ser aplicados a clientes cadastrados. Selecione o cliente antes de finalizar.',
+                'Cliente obrigatório'
+            );
+            setModalClienteAberto(true);
+            return;
+        }
+
         const vendaDTO = {
             valorTotal: totalGeral,
+            ...(precisaCliente && clienteVenda?.id ? { clienteId: clienteVenda.id } : {}),
             itens: itensCarrinho.map(it => ({
                 produto: { id: it.produtoId },
                 quantidade: it.qtd,
@@ -116,10 +132,12 @@ const Vendas = ({ usuarioLogado }) => {
             queryClient.invalidateQueries({ queryKey: ['historico-vendas'] });
 
             setItensCarrinho([]);
+            setClienteVenda(null);
         } catch (err) {
-            notify.error('Não foi possível salvar a venda.', 'PDV');
+            const msg = err.response?.data;
+            notify.error(typeof msg === 'string' ? msg : 'Não foi possível salvar a venda.', 'PDV');
         }
-    }, [itensCarrinho, totalGeral, queryClient, notify]);
+    }, [itensCarrinho, totalGeral, queryClient, notify, clienteVenda]);
 
     useEffect(() => {
         const handleF2 = (e) => {
@@ -149,6 +167,45 @@ const Vendas = ({ usuarioLogado }) => {
         setExibirSugestoes(false);
     };
 
+    const buscarClienteSugestoes = async (t) => {
+        const v = String(t || '').trim();
+        if (v.length < 1) {
+            setSugestoesCliente([]);
+            return;
+        }
+        try {
+            const res = await api.get(`/api/clientes/sugestoes?termo=${encodeURIComponent(v)}`);
+            setSugestoesCliente(Array.isArray(res.data) ? res.data : []);
+        } catch {
+            setSugestoesCliente([]);
+        }
+    };
+
+    const tentarBuscaPorCodigoBarras = async () => {
+        const t = String(termoBusca || '').trim();
+        if (!t || !/^\d{3,}$/.test(t)) return false;
+        try {
+            const res = await api.get(`/api/estoque/buscar-por-codigo?codigo=${encodeURIComponent(t)}`);
+            if (res.data) {
+                selecionarProduto(res.data);
+                return true;
+            }
+        } catch {
+            /* continua fluxo normal */
+        }
+        return false;
+    };
+
+    const onBuscaProdutoKeyDown = async (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const okCodigo = await tentarBuscaPorCodigoBarras();
+        if (okCodigo) return;
+        if (sugestoes.length > 0) {
+            selecionarProduto(sugestoes[0]);
+        }
+    };
+
     // --- LOGICA DO CARRINHO ---
     const adicionarAoCarrinho = () => {
         if (!produtoSelecionado) {
@@ -162,6 +219,14 @@ const Vendas = ({ usuarioLogado }) => {
         const descontoNum = Number(desconto) || 0;
         if (descontoNum > 10) {
             notify.warning('Desconto máximo permitido: 10%.', 'PDV');
+            return;
+        }
+        if (descontoNum > 0 && !clienteVenda?.id) {
+            notify.warning(
+                'Descontos só podem ser aplicados a clientes cadastrados. Busque e selecione o cliente.',
+                'PDV'
+            );
+            setModalClienteAberto(true);
             return;
         }
 
@@ -223,9 +288,17 @@ const Vendas = ({ usuarioLogado }) => {
                     <div className="row g-3 align-items-end mb-4 border-bottom border-secondary pb-4">
                         <div className="col-12 col-md-4 position-relative">
                             <label className="text-info small fw-bold text-uppercase">Localizar Produto</label>
-                            <input ref={inputBuscaRef} type="text" className="form-control bg-black text-white p-3"
-                                   value={termoBusca} onChange={(e) => buscarProdutos(e.target.value)}
-                                   placeholder="Nome ou código..." onBlur={() => setTimeout(() => setExibirSugestoes(false), 200)} />
+                            <input
+                                ref={inputBuscaRef}
+                                type="text"
+                                className="form-control bg-black text-white p-3"
+                                value={termoBusca}
+                                onChange={(e) => buscarProdutos(e.target.value)}
+                                onKeyDown={onBuscaProdutoKeyDown}
+                                placeholder="Nome, SKU ou código de barras (Enter)"
+                                onBlur={() => setTimeout(() => setExibirSugestoes(false), 200)}
+                                autoComplete="off"
+                            />
                             {exibirSugestoes && sugestoes.length > 0 && (
                                 <div className="shark-sugestoes-wrapper">
                                     {sugestoes.map(p => (
@@ -246,7 +319,12 @@ const Vendas = ({ usuarioLogado }) => {
                         </div>
                         <div className="col-12 col-sm-6 col-md-2">
                             <label className="text-info small fw-bold">DESC. (%)</label>
-                            <input type="number" className="form-control bg-black text-white p-3" value={desconto} onChange={e => setDesconto(e.target.value)} />
+                            <input
+                                type="number"
+                                className="form-control bg-black text-white p-3"
+                                value={desconto}
+                                onChange={(e) => setDesconto(e.target.value)}
+                            />
                         </div>
                         <div className="col-12 col-sm-6 col-md-2">
                             <label className="text-info small fw-bold">QTD</label>
@@ -254,6 +332,41 @@ const Vendas = ({ usuarioLogado }) => {
                         </div>
                         <div className="col-12 col-md-2">
                             <button type="button" className="btn btn-shark-primary w-100 p-3" onClick={adicionarAoCarrinho}>INCLUIR</button>
+                        </div>
+                    </div>
+
+                    {Number(desconto) > 0 && (
+                        <div className="alert alert-warning py-2 small mb-3 border-0" style={{ background: 'rgba(255, 193, 7, 0.12)', color: '#ffc107' }}>
+                            <i className="bi bi-info-circle me-2" />
+                            Descontos só podem ser aplicados a <strong>clientes cadastrados</strong>. Selecione o cliente antes de incluir ou finalizar.
+                        </div>
+                    )}
+
+                    <div className="row g-2 align-items-end mb-4">
+                        <div className="col-12 col-md-6">
+                            <label className="text-info small fw-bold text-uppercase">Cliente (obrigatório se houver desconto)</label>
+                            <div className="d-flex flex-wrap gap-2 align-items-center">
+                                <span className="text-white-50 small">
+                                    {clienteVenda ? (
+                                        <>
+                                            <strong className="text-white">{clienteVenda.nome}</strong>
+                                            <span className="text-muted ms-1">#{clienteVenda.id}</span>
+                                        </>
+                                    ) : (
+                                        'Nenhum selecionado'
+                                    )}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-info"
+                                    onClick={() => {
+                                        setModalClienteAberto(true);
+                                        buscarClienteSugestoes(termoCliente);
+                                    }}
+                                >
+                                    {clienteVenda ? 'Trocar cliente' : 'Buscar cliente'}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -296,7 +409,16 @@ const Vendas = ({ usuarioLogado }) => {
                             <h1 className="pdv-total-display fw-bold shark-pdv-total">R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h1>
                         </div>
                         <div className="d-flex gap-3 shark-pdv-actions">
-                            <button type="button" className="btn btn-shark-secondary btn-lg px-4" onClick={() => setItensCarrinho([])}>LIMPAR</button>
+                            <button
+                                type="button"
+                                className="btn btn-shark-secondary btn-lg px-4"
+                                onClick={() => {
+                                    setItensCarrinho([]);
+                                    setClienteVenda(null);
+                                }}
+                            >
+                                LIMPAR
+                            </button>
                             <button type="button" className="btn btn-success btn-lg px-5 fw-bold" onClick={finalizarVenda}>FINALIZAR (F2)</button>
                         </div>
                     </div>
@@ -374,6 +496,61 @@ const Vendas = ({ usuarioLogado }) => {
                 onPageChange={setHistPage}
                 disabled={histFetching}
             />
+
+            {modalClienteAberto && (
+                <div className="modal d-block" tabIndex="-1" style={{ background: 'rgba(0,0,0,0.65)' }} role="dialog">
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content bg-dark text-white border-secondary">
+                            <div className="modal-header border-secondary">
+                                <h5 className="modal-title">Cliente para desconto</h5>
+                                <button
+                                    type="button"
+                                    className="btn-close btn-close-white"
+                                    onClick={() => setModalClienteAberto(false)}
+                                    aria-label="Fechar"
+                                />
+                            </div>
+                            <div className="modal-body">
+                                <p className="small text-warning mb-2">
+                                    Descontos só podem ser aplicados a clientes cadastrados na empresa.
+                                </p>
+                                <input
+                                    type="text"
+                                    className="form-control bg-black text-white mb-2"
+                                    placeholder="Nome do cliente..."
+                                    value={termoCliente}
+                                    onChange={(e) => {
+                                        setTermoCliente(e.target.value);
+                                        buscarClienteSugestoes(e.target.value);
+                                    }}
+                                    autoFocus
+                                />
+                                <div className="list-group list-group-flush">
+                                    {sugestoesCliente.map((c) => (
+                                        <button
+                                            type="button"
+                                            key={c.id}
+                                            className="list-group-item list-group-item-action bg-black text-white border-secondary text-start"
+                                            onClick={() => {
+                                                setClienteVenda({ id: c.id, nome: c.nome });
+                                                setModalClienteAberto(false);
+                                                setTermoCliente('');
+                                                notify.success(`Cliente: ${c.nome}`, 'PDV');
+                                            }}
+                                        >
+                                            <strong>{c.nome}</strong>
+                                            <span className="text-muted small ms-2">{c.cpf || ''}</span>
+                                        </button>
+                                    ))}
+                                    {termoCliente.trim().length > 0 && sugestoesCliente.length === 0 && (
+                                        <div className="text-white-50 small py-2">Nenhum cliente encontrado.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

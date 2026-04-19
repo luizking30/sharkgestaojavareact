@@ -17,6 +17,7 @@ public final class ProdutoMapper {
         d.setPrecoCusto(p.getPrecoCusto());
         d.setPrecoVenda(p.getPrecoVenda());
         d.setQuantidade(p.getQuantidade());
+        d.setImagemUrl(p.getImagemUrl());
         return d;
     }
 
@@ -28,6 +29,7 @@ public final class ProdutoMapper {
         dest.setPrecoCusto(dto.getPrecoCusto());
         dest.setPrecoVenda(dto.getPrecoVenda());
         dest.setQuantidade(dto.getQuantidade());
+        dest.setImagemUrl(dto.getImagemUrl());
     }
 
     public static Long parseIdOrNull(Object raw) {

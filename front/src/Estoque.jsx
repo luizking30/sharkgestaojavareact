@@ -20,7 +20,8 @@ const Estoque = ({ usuarioLogado }) => {
         nome: '',
         precoCusto: '',
         precoVenda: '',
-        quantidade: 1
+        quantidade: 1,
+        imagemUrl: '',
     });
     const [editando, setEditando] = useState(false);
     const podeGerir = podeGerirEstoque(usuarioLogado?.role);
@@ -46,15 +47,16 @@ const Estoque = ({ usuarioLogado }) => {
             const res = await api.get('/api/estoque/resumo-financeiro');
             return res.data;
         },
+        staleTime: 0,
     });
 
     // 2. MUTATION PARA SALVAR/ATUALIZAR
     const saveMutation = useMutation({
         mutationFn: (novoProduto) => api.post('/api/estoque/salvar', novoProduto),
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: ['estoque-produtos'] });
-            queryClient.invalidateQueries({ queryKey: ['estoque-resumo-financeiro'] });
-            queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] }); // Sincroniza Dashboard
+        onSuccess: async (_data, variables) => {
+            await queryClient.invalidateQueries({ queryKey: ['estoque-produtos'] });
+            await queryClient.refetchQueries({ queryKey: ['estoque-resumo-financeiro'] });
+            await queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] });
             notify.success(variables?.id ? 'Produto atualizado!' : 'Produto salvo!', 'Estoque');
             limparFormulario();
         },
@@ -64,10 +66,10 @@ const Estoque = ({ usuarioLogado }) => {
     // 3. MUTATION PARA DELETAR
     const deleteMutation = useMutation({
         mutationFn: (id) => api.delete(`/api/estoque/deletar/${id}`),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['estoque-produtos'] });
-            queryClient.invalidateQueries({ queryKey: ['estoque-resumo-financeiro'] });
-            queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] }); // Sincroniza Dashboard
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['estoque-produtos'] });
+            await queryClient.refetchQueries({ queryKey: ['estoque-resumo-financeiro'] });
+            await queryClient.invalidateQueries({ queryKey: ['dados-dashboard'] });
         },
         onError: () => notify.error('Erro ao excluir o produto.', 'Estoque')
     });
@@ -83,9 +85,27 @@ const Estoque = ({ usuarioLogado }) => {
         return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
 
+    const margemPct = (custo, venda) => {
+        const c = Number(custo) || 0;
+        const v = Number(venda) || 0;
+        if (v <= 0) return '—';
+        return `${(((v - c) / v) * 100).toFixed(1)}%`;
+    };
+
+    const markupPct = (custo, venda) => {
+        const c = Number(custo) || 0;
+        const v = Number(venda) || 0;
+        if (c <= 0) return '—';
+        return `${(((v - c) / c) * 100).toFixed(1)}%`;
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        if (name === 'codigoBarras') {
+            setFormData((prev) => ({ ...prev, [name]: String(value).replace(/\D/g, '') }));
+            return;
+        }
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const verificarDuplicidade = async (codigo) => {
@@ -104,13 +124,16 @@ const Estoque = ({ usuarioLogado }) => {
             notify.warning('Somente administradores podem editar o estoque.', 'Permissão');
             return;
         }
-        setFormData(produto);
+        setFormData({
+            ...produto,
+            imagemUrl: produto.imagemUrl ?? '',
+        });
         setEditando(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const limparFormulario = () => {
-        setFormData({ id: '', codigoBarras: '', nome: '', precoCusto: '', precoVenda: '', quantidade: 1 });
+        setFormData({ id: '', codigoBarras: '', nome: '', precoCusto: '', precoVenda: '', quantidade: 1, imagemUrl: '' });
         setEditando(false);
     };
 
@@ -155,6 +178,11 @@ const Estoque = ({ usuarioLogado }) => {
                             <label className="form-label text-info small fw-bold text-uppercase">Nome do Produto</label>
                             <input name="nome" value={formData.nome} onChange={handleInputChange}
                                    className="form-control bg-black text-white border-secondary shadow-none" placeholder="Ex: Teclado Mecânico" required />
+                        </div>
+                        <div className="col-12 col-md-3">
+                            <label className="form-label text-info small fw-bold text-uppercase">URL da imagem (opcional)</label>
+                            <input name="imagemUrl" type="url" value={formData.imagemUrl || ''} onChange={handleInputChange}
+                                   className="form-control bg-black text-white border-secondary shadow-none" placeholder="https://..." />
                         </div>
                         <div className="col-12 col-sm-6 col-md-2">
                             <label className="form-label text-info small fw-bold text-uppercase">Custo (Und)</label>
@@ -210,30 +238,61 @@ const Estoque = ({ usuarioLogado }) => {
 
             <div className="card shadow-lg border-0 bg-dark text-white mb-5" style={{ borderRadius: '15px', overflow: 'hidden', borderLeft: '5px solid #333' }}>
                 <div className="table-responsive shark-mobile-cards">
-                    <table className="table table-hover table-dark mb-0 align-middle text-center">
-                        <thead className="bg-black text-muted text-uppercase small">
+                    <table className="table table-hover table-dark mb-0 align-middle text-center small">
+                        <thead className="bg-black text-muted text-uppercase">
                         <tr>
-                            <th className="ps-4 text-start">CÓD/SKU</th>
-                            <th className="text-start">PRODUTO</th>
-                            <th>QTD</th>
-                            <th>CUSTO (UND)</th>
-                            <th>VENDA (UND)</th>
-                            <th>LUCRO (UND)</th>
-                            <th>AÇÕES</th>
+                            <th className="ps-2 text-start" rowSpan={2}>IMG</th>
+                            <th className="text-start" rowSpan={2}>Cód / SKU</th>
+                            <th className="text-start" rowSpan={2}>Produto</th>
+                            <th rowSpan={2}>Qtd</th>
+                            <th colSpan={2} className="text-danger border-bottom border-secondary">Custo</th>
+                            <th colSpan={2} className="text-success border-bottom border-secondary">Venda</th>
+                            <th colSpan={4} className="text-info border-bottom border-secondary">Lucro</th>
+                            <th rowSpan={2}>Ações</th>
+                        </tr>
+                        <tr className="text-white-50" style={{ fontSize: '0.65rem' }}>
+                            <th className="text-danger">(und)</th>
+                            <th className="text-danger">(t.)</th>
+                            <th className="text-success">(und)</th>
+                            <th className="text-success">(t.)</th>
+                            <th className="text-info">(und)</th>
+                            <th className="text-info">(t.)</th>
+                            <th className="text-warning">Marg.</th>
+                            <th className="text-warning">Mk.</th>
                         </tr>
                         </thead>
                         <tbody>
                         {isLoading && !pageData ? (
-                            <tr><td colSpan={7} className="text-center py-4 text-info">Carregando…</td></tr>
+                            <tr><td colSpan={13} className="text-center py-4 text-info">Carregando…</td></tr>
                         ) : (
-                        produtos.map(p => (
+                        produtos.map(p => {
+                            const q = p.quantidade ?? 0;
+                            const cu = Number(p.precoCusto) || 0;
+                            const vu = Number(p.precoVenda) || 0;
+                            const lu = vu - cu;
+                            const ct = cu * q;
+                            const vt = vu * q;
+                            const lt = lu * q;
+                            return (
                             <tr key={p.id}>
-                                <td className="ps-4 text-start fw-bold text-info" data-label="Cód/SKU">{p.codigoBarras || 'S/C'}</td>
+                                <td className="ps-2 text-start" data-label="Imagem">
+                                    {p.imagemUrl ? (
+                                        <img src={p.imagemUrl} alt="" className="rounded" style={{ width: 36, height: 36, objectFit: 'cover' }} />
+                                    ) : (
+                                        <span className="text-white-50">—</span>
+                                    )}
+                                </td>
+                                <td className="text-start fw-bold text-info" data-label="Cód/SKU">{p.codigoBarras || 'S/C'}</td>
                                 <td className="text-start fw-bold" data-label="Produto">{p.nome}</td>
-                                <td className="fw-bold" data-label="Qtd">{p.quantidade}</td>
-                                <td className="text-danger" data-label="Custo (und)">{formatarMoeda(p.precoCusto)}</td>
-                                <td className="text-success fw-bold" data-label="Venda (und)">{formatarMoeda(p.precoVenda)}</td>
-                                <td className="text-info fw-bold" data-label="Lucro (und)">{formatarMoeda(p.precoVenda - p.precoCusto)}</td>
+                                <td className="fw-bold" data-label="Qtd">{q}</td>
+                                <td className="text-danger" data-label="Custo und">{formatarMoeda(cu)}</td>
+                                <td className="text-danger" data-label="Custo t.">{formatarMoeda(ct)}</td>
+                                <td className="text-success" data-label="Venda und">{formatarMoeda(vu)}</td>
+                                <td className="text-success" data-label="Venda t.">{formatarMoeda(vt)}</td>
+                                <td className="text-info" data-label="Lucro und">{formatarMoeda(lu)}</td>
+                                <td className="text-info" data-label="Lucro t.">{formatarMoeda(lt)}</td>
+                                <td className="text-warning" style={{ fontSize: '0.7rem' }} data-label="Margem %">{margemPct(cu, vu)}</td>
+                                <td className="text-warning" style={{ fontSize: '0.7rem' }} data-label="Markup %">{markupPct(cu, vu)}</td>
                                 <td className="text-center" data-label="Ações">
                                     <div className="btn-group gap-1">
                                         <button onClick={() => prepararEdicao(p)}
@@ -248,7 +307,8 @@ const Estoque = ({ usuarioLogado }) => {
                                     </div>
                                 </td>
                             </tr>
-                        ))
+                            );
+                        })
                         )}
                         </tbody>
                     </table>

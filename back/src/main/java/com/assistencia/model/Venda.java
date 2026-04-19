@@ -46,6 +46,13 @@ public class Venda {
     @Column(name = "nome_vendedor_no_ato")
     private String nomeVendedorNoAto;
 
+    /** Obrigatório quando a venda contém itens com desconto (PDV). */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "cliente_id", nullable = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Cliente cliente;
+
     private boolean pago = false;
 
     @OneToMany(mappedBy = "venda", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

@@ -15,6 +15,8 @@ public class VendaResponseDTO {
     private Double comissaoVendedorValor;
     private Double taxaComissaoAplicada;
     private String nomeVendedorNoAto;
+    /** Cliente vinculado quando houve desconto na venda. */
+    private String clienteNome;
     private boolean pago;
     private TecnicoResumoDTO vendedor;
     private List<ItemVendaResponseDTO> itens = new ArrayList<>();
@@ -33,6 +35,8 @@ public class VendaResponseDTO {
     public void setTaxaComissaoAplicada(Double taxaComissaoAplicada) { this.taxaComissaoAplicada = taxaComissaoAplicada; }
     public String getNomeVendedorNoAto() { return nomeVendedorNoAto; }
     public void setNomeVendedorNoAto(String nomeVendedorNoAto) { this.nomeVendedorNoAto = nomeVendedorNoAto; }
+    public String getClienteNome() { return clienteNome; }
+    public void setClienteNome(String clienteNome) { this.clienteNome = clienteNome; }
     public boolean isPago() { return pago; }
     public void setPago(boolean pago) { this.pago = pago; }
     public TecnicoResumoDTO getVendedor() { return vendedor; }

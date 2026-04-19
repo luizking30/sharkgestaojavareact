@@ -24,6 +24,9 @@ public final class VendaMapper {
         d.setComissaoVendedorValor(v.getComissaoVendedorValor());
         d.setTaxaComissaoAplicada(v.getTaxaComissaoAplicada());
         d.setNomeVendedorNoAto(v.getNomeVendedorNoAto());
+        if (v.getCliente() != null) {
+            d.setClienteNome(v.getCliente().getNome());
+        }
         d.setPago(v.isPago());
         d.setVendedor(UsuarioMapper.toTecnicoResumo(v.getVendedor()));
         if (v.getItens() != null) {
