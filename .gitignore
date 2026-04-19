@@ -11,6 +11,9 @@ back/.idea/
 front/node_modules/
 front/dist/
 
+# Uploads locais (imagens de produto no servidor)
+uploads/
+
 # Logs e arquivos temporários
 *.log
 .DS_Store

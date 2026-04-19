@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import api from './api';
 import { unwrapPage } from './utils/pageResponse';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -24,6 +24,8 @@ const Estoque = ({ usuarioLogado }) => {
         imagemUrl: '',
     });
     const [editando, setEditando] = useState(false);
+    const [uploadingImg, setUploadingImg] = useState(false);
+    const fileInputRef = useRef(null);
     const podeGerir = podeGerirEstoque(usuarioLogado?.role);
 
     const { data: pageData, isLoading, isFetching } = useQuery({
@@ -75,11 +77,16 @@ const Estoque = ({ usuarioLogado }) => {
     });
 
     // Cálculos Financeiros
-    const financeiro = useMemo(() => ({
-        investido: resumo?.investido ?? 0,
-        faturamento: resumo?.faturamento ?? 0,
-        lucro: resumo?.lucro ?? ((resumo?.faturamento ?? 0) - (resumo?.investido ?? 0)),
-    }), [resumo]);
+    const financeiro = useMemo(() => {
+        const investido = resumo?.investido ?? 0;
+        const faturamento = resumo?.faturamento ?? 0;
+        const lucro = resumo?.lucro ?? faturamento - investido;
+        const margemGeral =
+            faturamento > 0 ? ((lucro / faturamento) * 100).toFixed(1) : null;
+        const markupGeral =
+            investido > 0 ? ((lucro / investido) * 100).toFixed(1) : null;
+        return { investido, faturamento, lucro, margemGeral, markupGeral };
+    }, [resumo]);
 
     const formatarMoeda = (valor) => {
         return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -146,6 +153,37 @@ const Estoque = ({ usuarioLogado }) => {
         saveMutation.mutate(formData);
     };
 
+    const onEscolherArquivoImagem = async (e) => {
+        const f = e.target.files?.[0];
+        e.target.value = '';
+        if (!f) return;
+        if (!f.type.startsWith('image/')) {
+            notify.warning('Selecione um arquivo de imagem (JPEG, PNG, WebP ou GIF).', 'Estoque');
+            return;
+        }
+        if (!podeGerir) {
+            notify.warning('Sem permissão para enviar imagem.', 'Estoque');
+            return;
+        }
+        setUploadingImg(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', f);
+            const res = await api.post('/api/estoque/upload-imagem', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            const url = res.data?.url;
+            if (url) {
+                setFormData((prev) => ({ ...prev, imagemUrl: url }));
+                notify.success('Imagem enviada. Salve o produto para manter.', 'Estoque');
+            }
+        } catch {
+            notify.error('Não foi possível enviar a imagem.', 'Estoque');
+        } finally {
+            setUploadingImg(false);
+        }
+    };
+
     const handleDeletar = async (id) => {
         if (!podeGerir) {
             notify.warning('Somente administradores podem excluir itens.', 'Permissão');
@@ -180,9 +218,54 @@ const Estoque = ({ usuarioLogado }) => {
                                    className="form-control bg-black text-white border-secondary shadow-none" placeholder="Ex: Teclado Mecânico" required />
                         </div>
                         <div className="col-12 col-md-3">
-                            <label className="form-label text-info small fw-bold text-uppercase">URL da imagem (opcional)</label>
-                            <input name="imagemUrl" type="url" value={formData.imagemUrl || ''} onChange={handleInputChange}
-                                   className="form-control bg-black text-white border-secondary shadow-none" placeholder="https://..." />
+                            <label className="form-label text-info small fw-bold text-uppercase">Foto do produto</label>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                className="d-none"
+                                onChange={onEscolherArquivoImagem}
+                                disabled={!podeGerir || uploadingImg}
+                            />
+                            <div className="d-flex flex-wrap align-items-center gap-2">
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-info btn-sm"
+                                    disabled={!podeGerir || uploadingImg}
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    {uploadingImg ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-1" />
+                                            Enviando…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-image me-1" />
+                                            Escolher imagem
+                                        </>
+                                    )}
+                                </button>
+                                {formData.imagemUrl ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="btn btn-link btn-sm text-white-50 p-0"
+                                            onClick={() => setFormData((p) => ({ ...p, imagemUrl: '' }))}
+                                        >
+                                            Remover
+                                        </button>
+                                        <img
+                                            src={formData.imagemUrl}
+                                            alt=""
+                                            className="rounded border border-secondary"
+                                            style={{ width: 48, height: 48, objectFit: 'cover' }}
+                                        />
+                                    </>
+                                ) : (
+                                    <span className="text-white-50 small">Nenhuma</span>
+                                )}
+                            </div>
                         </div>
                         <div className="col-12 col-sm-6 col-md-2">
                             <label className="form-label text-info small fw-bold text-uppercase">Custo (Und)</label>
@@ -231,6 +314,13 @@ const Estoque = ({ usuarioLogado }) => {
                 <div className="col-12 col-md-4">
                     <div className="card p-3 shark-page-card border-left-info shadow-sm">
                         <p className="text-info small fw-bold mb-1 text-uppercase">Lucro Líquido Previsto</p>
+                        {(financeiro.margemGeral != null || financeiro.markupGeral != null) && (
+                            <div className="text-white-50 mb-1" style={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
+                                {financeiro.margemGeral != null && <span>marg {financeiro.margemGeral}%</span>}
+                                {financeiro.margemGeral != null && financeiro.markupGeral != null && ' · '}
+                                {financeiro.markupGeral != null && <span>mk {financeiro.markupGeral}%</span>}
+                            </div>
+                        )}
                         <h3 className="fw-bold text-white mb-0">{formatarMoeda(financeiro.lucro)}</h3>
                     </div>
                 </div>
@@ -247,7 +337,7 @@ const Estoque = ({ usuarioLogado }) => {
                             <th rowSpan={2}>Qtd</th>
                             <th colSpan={2} className="text-danger border-bottom border-secondary">Custo</th>
                             <th colSpan={2} className="text-success border-bottom border-secondary">Venda</th>
-                            <th colSpan={4} className="text-info border-bottom border-secondary">Lucro</th>
+                            <th colSpan={2} className="text-info border-bottom border-secondary">Lucro</th>
                             <th rowSpan={2}>Ações</th>
                         </tr>
                         <tr className="text-white-50" style={{ fontSize: '0.65rem' }}>
@@ -257,13 +347,11 @@ const Estoque = ({ usuarioLogado }) => {
                             <th className="text-success">(t.)</th>
                             <th className="text-info">(und)</th>
                             <th className="text-info">(t.)</th>
-                            <th className="text-warning">Marg.</th>
-                            <th className="text-warning">Mk.</th>
                         </tr>
                         </thead>
                         <tbody>
                         {isLoading && !pageData ? (
-                            <tr><td colSpan={13} className="text-center py-4 text-info">Carregando…</td></tr>
+                            <tr><td colSpan={11} className="text-center py-4 text-info">Carregando…</td></tr>
                         ) : (
                         produtos.map(p => {
                             const q = p.quantidade ?? 0;
@@ -289,10 +377,22 @@ const Estoque = ({ usuarioLogado }) => {
                                 <td className="text-danger" data-label="Custo t.">{formatarMoeda(ct)}</td>
                                 <td className="text-success" data-label="Venda und">{formatarMoeda(vu)}</td>
                                 <td className="text-success" data-label="Venda t.">{formatarMoeda(vt)}</td>
-                                <td className="text-info" data-label="Lucro und">{formatarMoeda(lu)}</td>
-                                <td className="text-info" data-label="Lucro t.">{formatarMoeda(lt)}</td>
-                                <td className="text-warning" style={{ fontSize: '0.7rem' }} data-label="Margem %">{margemPct(cu, vu)}</td>
-                                <td className="text-warning" style={{ fontSize: '0.7rem' }} data-label="Markup %">{markupPct(cu, vu)}</td>
+                                <td className="text-info" data-label="Lucro und">
+                                    <div className="d-flex flex-column align-items-center gap-0">
+                                        <span className="text-white-50" style={{ fontSize: '0.58rem', lineHeight: 1.15 }}>
+                                            marg {margemPct(cu, vu)} · mk {markupPct(cu, vu)}
+                                        </span>
+                                        <span className="fw-bold">{formatarMoeda(lu)}</span>
+                                    </div>
+                                </td>
+                                <td className="text-info" data-label="Lucro t.">
+                                    <div className="d-flex flex-column align-items-center gap-0">
+                                        <span className="text-white-50" style={{ fontSize: '0.58rem', lineHeight: 1.15 }}>
+                                            marg {margemPct(cu, vu)} · mk {markupPct(cu, vu)}
+                                        </span>
+                                        <span className="fw-bold">{formatarMoeda(lt)}</span>
+                                    </div>
+                                </td>
                                 <td className="text-center" data-label="Ações">
                                     <div className="btn-group gap-1">
                                         <button onClick={() => prepararEdicao(p)}

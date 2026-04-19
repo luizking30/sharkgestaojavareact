@@ -11,13 +11,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -134,6 +142,66 @@ public class EstoqueController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Erro: " + e.getMessage());
         }
+    }
+
+    @PostMapping(value = "/upload-imagem", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadImagem(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+        Usuario logado = securityUtils.getUsuarioLogado();
+        if (logado == null) {
+            return ResponseEntity.status(401).build();
+        }
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body("Arquivo vazio.");
+        }
+        String ct = file.getContentType();
+        String ext = extensaoImagem(ct);
+        if (ext == null) {
+            return ResponseEntity.badRequest().body("Envie uma imagem (JPEG, PNG, WebP ou GIF).");
+        }
+
+        long empresaId = logado.getEmpresa().getId();
+        String nome = UUID.randomUUID() + ext;
+        try {
+            Path dir = Paths.get("uploads", "produtos", String.valueOf(empresaId)).toAbsolutePath().normalize();
+            Files.createDirectories(dir);
+            Path dest = dir.resolve(nome);
+            file.transferTo(dest.toFile());
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().body("Falha ao salvar imagem.");
+        }
+
+        String path = "/uploads/produtos/" + empresaId + "/" + nome;
+        String url = publicBaseUrl(request) + path;
+        Map<String, String> body = new HashMap<>();
+        body.put("url", url);
+        return ResponseEntity.ok(body);
+    }
+
+    /** Origem pública (respeita proxy quando configurado). */
+    private static String publicBaseUrl(HttpServletRequest request) {
+        String scheme = request.getScheme();
+        String host = request.getServerName();
+        int port = request.getServerPort();
+        StringBuilder sb = new StringBuilder();
+        sb.append(scheme).append("://").append(host);
+        if (("http".equals(scheme) && port != 80) || ("https".equals(scheme) && port != 443)) {
+            sb.append(':').append(port);
+        }
+        return sb.toString();
+    }
+
+    private static String extensaoImagem(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+        String c = contentType.toLowerCase().split(";")[0].trim();
+        return switch (c) {
+            case "image/jpeg", "image/jpg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            default -> null;
+        };
     }
 
     @DeleteMapping("/deletar/{id}")

@@ -46,6 +46,8 @@ public class SecurityConfig {
                                 "/error/**",
                                 "/favicon.ico"
                         ).permitAll()
+                        // Imagens de produto servidas pelo Spring (uploads/)
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
                         // 👑 SUPER ADMIN (Fundador Shark): Acesso exclusivo ao ecossistema
                         .requestMatchers("/api/super-admin/**").hasRole("OWNER")
