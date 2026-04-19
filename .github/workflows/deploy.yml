@@ -2,7 +2,7 @@ name: Deploy Shark Gestão
 
 on:
   push:
-    branches: [ "master" ] # deploy ao push em master (teste workflow VPS — 2026-04-18)
+    branches: [ "master" ] # deploy ao push em master (re-teste CI deploy VPS)
 
 jobs:
   deploy:
