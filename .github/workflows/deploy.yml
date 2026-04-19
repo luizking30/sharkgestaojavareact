@@ -1,0 +1,33 @@
+name: Deploy Shark Gestão
+
+on:
+  push:
+    branches: [ "master" ] # deploy ao dar push na branch master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conectar na VPS e Atualizar
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            # 1. Entrar na pasta do projeto (Ajuste o caminho se necessário)
+            cd ~/sharkgestaojavareact 
+            
+            # 2. Limpar qualquer lixo local para não travar o pull
+            git stash
+            
+            # 3. Puxar o código novo do GitHub
+            git pull origin master
+            
+            # 4. Rebuildar apenas o Back-end (Spring Boot)
+            # O banco de dados e a evolution não são afetados
+            docker compose up -d --build shark-api
+            
+            # 5. Limpar imagens antigas (Vital para sua VPS de 1GB)
+            docker image prune -f
